@@ -1,0 +1,9 @@
+{
+  "name": "filter-package",
+  "devDependencies": {
+    "dprint": "^0.48.0",
+    "eslint": "^9.17.0",
+    "eslint-config-kagura": "^3.0.1",
+    "typescript": "^5.7.2"
+  }
+}

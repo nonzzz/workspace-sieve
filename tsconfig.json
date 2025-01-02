@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+      "allowJs": true,
+      "baseUrl": ".",
+      "noImplicitThis": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "target": "ESNext",
+      "lib": ["esnext", "DOM"],
+      "resolveJsonModule": true,
+      "module": "ESNext",
+      "moduleResolution": "Bundler",
+      "outDir": "dist",
+      "strict": true
+    }
+  }
+  
