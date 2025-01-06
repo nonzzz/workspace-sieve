@@ -129,3 +129,9 @@ export interface WorkspaceFilter {
   filter: string
   followProdDepsOnly: boolean
 }
+
+export interface SupportedArchitectures {
+  os?: string[]
+  cpu?: string[]
+  libc?: string[]
+}

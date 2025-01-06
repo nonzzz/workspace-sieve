@@ -6,6 +6,7 @@ const path = std.fs.path;
 const LexError = error{
     InvalidCurlyBrace,
     UnexpectChar,
+    OutOfBound,
 };
 
 // pub const LexSelectorOptions = struct {
@@ -92,7 +93,7 @@ pub const LexSelector = struct {
                 _ = self.sb.s.orderedRemove(0);
             }
         }
-        self.matched = self.regexp() catch {
+        self.matched = self.symbol_match() catch {
             if (self.is_selector_by_loc()) {
                 self.matched.name = try path.join(self.allocator, &[_][]const u8{
                     prefix,
@@ -129,33 +130,41 @@ pub const LexSelector = struct {
         };
     }
 
-    fn regexp(self: *Self) !MatchResult {
+    /// ^([^.][^{}[\]]*)?(\{[^}]+\})?(\[[^\]]+\])?$/)
+    /// I don't want to link perl.
+    /// I hope zig implement a offical reg exp engine :-(
+    fn symbol_match(self: *Self) !MatchResult {
         var result = MatchResult{};
         var index: usize = 0;
         const str = self.sb.s.items;
-        while (index < str.len and std.ascii.isWhitespace(str[index])) {
-            index += 1;
+        if (str.len <= 1) {
+            return error.OutOfBound;
         }
-        if (index < str.len and str[index] != '.') {
+        if (str[index] == '.') {
+            return error.UnexpectChar;
+        }
+
+        if (index < str.len) {
             const start = index;
             while (index < str.len) {
                 const c = str[index];
                 if (c == '{' or c == '[' or c == ']' or c == '}') break;
                 index += 1;
             }
-            if (index > start) {
-                result.name = try self.allocator.dupe(u8, str[start..index]);
+            const end = index;
+            if (start != index) {
+                result.name = try self.allocator.dupe(u8, str[start..end]);
             }
         }
 
         if (index < str.len and str[index] == '{') {
-            const start = index + 1;
-            index += 1;
+            const start = index;
             while (index < str.len and str[index] != '}') {
                 index += 1;
             }
             if (index < str.len and str[index] == '}') {
-                result.curly = try self.allocator.dupe(u8, str[start..index]);
+                const end = if (index == str.len) index else index + 1;
+                result.curly = try self.allocator.dupe(u8, str[start..end]);
                 index += 1;
             } else {
                 return error.InvalidCurlyBrace;
@@ -163,13 +172,13 @@ pub const LexSelector = struct {
         }
 
         if (index < str.len and str[index] == '[') {
-            const start = index + 1;
-            index += 1;
+            const start = index;
             while (index < str.len and str[index] != ']') {
                 index += 1;
             }
             if (index < str.len and str[index] == ']') {
-                result.square = try self.allocator.dupe(u8, str[start..index]);
+                const end = if (index == str.len) index else index + 1;
+                result.square = try self.allocator.dupe(u8, str[start..end]);
                 index += 1;
             } else {
                 return error.InvalidSquareBracket;
@@ -276,7 +285,7 @@ fn compareStructs(comptime T: type, a: T, b: T) bool {
 }
 
 fn TestLexSelector(allocator: Allocator, input: []const u8, expect: LexSelector.ParseResult) !void {
-    var selector = LexSelector.init(allocator, .{});
+    var selector = LexSelector.init(allocator);
     defer selector.deinit();
     const act = try selector.parse(input, "");
     try std.testing.expect(compareStructs(LexSelector.ParseResult, act, expect));
@@ -363,73 +372,73 @@ test "LexSelector" {
         .parent_dir = "../foo",
     });
 
-    // try TestLexSelector(std.testing.allocator, ".../{foo}", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = null,
-    //     .parent_dir = "../foo",
-    // });
+    try TestLexSelector(std.testing.allocator, "...{./foo}", .{
+        .diff = null,
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = false,
+        .include_dependents = true,
+        .name_pattern = null,
+        .parent_dir = "./foo",
+    });
 
-    // try TestLexSelector(std.testing.allocator, "[master]", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = "foo",
-    //     .parent_dir = null,
-    // });
+    try TestLexSelector(std.testing.allocator, "[master]", .{
+        .diff = "master",
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = false,
+        .include_dependents = false,
+        .name_pattern = null,
+        .parent_dir = null,
+    });
 
-    // try TestLexSelector(std.testing.allocator, "{foo}[master]", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = "foo",
-    //     .parent_dir = null,
-    // });
+    try TestLexSelector(std.testing.allocator, "{foo}[master]", .{
+        .diff = "master",
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = false,
+        .include_dependents = false,
+        .name_pattern = null,
+        .parent_dir = "foo",
+    });
 
-    // try TestLexSelector(std.testing.allocator, "pattern{foo}[master]", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = "foo",
-    //     .parent_dir = null,
-    // });
+    try TestLexSelector(std.testing.allocator, "pattern{foo}[master]", .{
+        .diff = "master",
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = false,
+        .include_dependents = false,
+        .name_pattern = "pattern",
+        .parent_dir = "foo",
+    });
 
-    // try TestLexSelector(std.testing.allocator, "[master]...", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = "foo",
-    //     .parent_dir = null,
-    // });
+    try TestLexSelector(std.testing.allocator, "[master]...", .{
+        .diff = "master",
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = true,
+        .include_dependents = false,
+        .name_pattern = null,
+        .parent_dir = null,
+    });
 
-    // try TestLexSelector(std.testing.allocator, "...[master]", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = "foo",
-    //     .parent_dir = null,
-    // });
+    try TestLexSelector(std.testing.allocator, "...[master]", .{
+        .diff = "master",
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = false,
+        .include_dependents = true,
+        .name_pattern = null,
+        .parent_dir = null,
+    });
 
-    // try TestLexSelector(std.testing.allocator, "...[master]...", .{
-    //     .diff = null,
-    //     .exclude = false,
-    //     .exclude_self = false,
-    //     .include_dependencies = false,
-    //     .include_dependents = true,
-    //     .name_pattern = "foo",
-    //     .parent_dir = null,
-    // });
+    try TestLexSelector(std.testing.allocator, "...[master]...", .{
+        .diff = "master",
+        .exclude = false,
+        .exclude_self = false,
+        .include_dependencies = true,
+        .include_dependents = true,
+        .name_pattern = null,
+        .parent_dir = null,
+    });
 }

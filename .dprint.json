@@ -1,5 +1,4 @@
 {
-    "lineWidth": 140,
-    "extends": "https://dprint.nonzzz.moe/dprint.json"
-  }
-  
+  "lineWidth": 140,
+  "extends": "https://dprint.nonzzz.moe/dprint.json"
+}

@@ -1,6 +1,4 @@
-import type { Package, PackageGraph, WorkspaceFilter } from './interface'
-
-declare const lexSelector: string
+import type { Package, PackageGraph, SupportedArchitectures } from './interface'
 
 let wasm: typeof import('./lex-selector.wasm')
 
@@ -16,13 +14,18 @@ export interface FilterPackagesOptions {
   sharedWorkspaceLockfile?: boolean
 }
 
+export interface WorkspaceFilter {
+  filter: string
+  followProdDepsOnly: boolean
+}
+
 export interface FilterPackagesResult<P extends Package> {
   allProjectsGraph: PackageGraph<P>
   selectedProjectsGraph: PackageGraph<P>
   unmatchedFilters: string[]
 }
 
-export function filterPackages<P extends Package>(pkgs: P[], filter: WorkspaceFilter, options?: FilterPackagesOptions) {}
+// export function filterPackages<P extends Package>(pkgs: P[], filter: WorkspaceFilter, options?: FilterPackagesOptions) {}
 
 function loadWASM() {
   if (wasm) {
@@ -33,7 +36,12 @@ function loadWASM() {
   wasm = new WebAssembly.Instance(compiled).exports as typeof wasm
 }
 
-export function parsePacakgeSelector(options: any) {
+export interface ParsePackageSelector {
+  input: string
+  prefix: string
+}
+
+export function parsePackageSelector(options: ParsePackageSelector) {
   if (!wasm) {
     loadWASM()
   }
@@ -41,4 +49,15 @@ export function parsePacakgeSelector(options: any) {
   const { written } = TextEncode.encodeInto(JSON.stringify(options), memoryView)
   const output = wasm.parse_pkg_selector(0, written)
   return new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, 0, output))
+}
+
+export interface FilterPackageFromDirOptions extends FilterPackagesOptions {
+  engineStrict?: boolean
+  nodeVersion?: string
+  patterns?: string[]
+  supportedArchitectures?: SupportedArchitectures
+}
+
+export function filterPackagesFromDir(workspaceDir: string, filter: WorkspaceFilter[], options: FilterPackageFromDirOptions) {
+  //
 }

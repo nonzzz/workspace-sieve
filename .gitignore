@@ -3,3 +3,4 @@ dist
 zig-out/*
 node_modules
 *.wasm
+.DS_Store

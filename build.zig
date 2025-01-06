@@ -30,4 +30,7 @@ pub fn build(b: *std.Build) void {
         "../src",
         "lex-selector.wasm",
     })).step);
+
+    const rollup_build_script = b.addSystemCommand(&.{ "./node_modules/.bin/rollup", "-c", "rollup.config.mjs" });
+    build_wasm_step.dependOn(&rollup_build_script.step);
 }
