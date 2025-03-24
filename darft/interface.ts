@@ -1,18 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export interface ExportFields {
-  import?: string
-  require?: string
-  default?: string
-}
-
-export interface PackageJSONMetadata {
-  type: 'commonjs' | 'module'
-  main?: string
-  module?: string
-  exports?: Record<string, ExportFields | string>
-  [prop: string]: any
-}
-
 export type PackageBin = string | { [commandName: string]: string }
 
 export type Dependencies = Record<string, string>
@@ -167,10 +152,4 @@ export interface PackageSelector {
   namePattern?: string
   parentDir?: string
   followProdDepsOnly?: boolean
-}
-
-export interface PackageMetadata {
-  manifest: ProjectManifest
-  manifestPath: string
-  dirPath: string
 }
