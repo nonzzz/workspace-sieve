@@ -1,13 +1,6 @@
-import replace from '@rollup/plugin-replace'
-import fs from 'fs'
-import path from 'path'
 import { defineConfig } from 'rollup'
 import dts from 'rollup-plugin-dts'
 import { swc } from 'rollup-plugin-swc3'
-
-const defaultWd = process.cwd()
-
-const wasm = fs.readFileSync(path.join(defaultWd, '/src/lex-selector.wasm')).toString('base64')
 
 export default defineConfig([
   {
@@ -16,7 +9,7 @@ export default defineConfig([
       { dir: 'dist', format: 'esm', exports: 'named', entryFileNames: '[name].mjs' },
       { dir: 'dist', format: 'cjs', exports: 'named', entryFileNames: '[name].js' }
     ],
-    plugins: [replace({ lexSelector: JSON.stringify(wasm) }), swc()]
+    plugins: [swc()]
   },
   {
     input: 'src/index.ts',

@@ -1,3 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface ExportFields {
+  import?: string
+  require?: string
+  default?: string
+}
+
+export interface PackageJSONMetadata {
+  type: 'commonjs' | 'module'
+  main?: string
+  module?: string
+  exports?: Record<string, ExportFields | string>
+  [prop: string]: any
+}
+
 export type PackageBin = string | { [commandName: string]: string }
 
 export type Dependencies = Record<string, string>
@@ -111,9 +126,16 @@ export interface BaseManifest {
   exports?: Record<string, string>
 }
 
+export interface ProjectManifest extends BaseManifest {
+  packageManager?: string
+  workspaces?: string[]
+  private?: boolean
+  resolutions?: Record<string, string>
+}
+
 export interface Package {
   manifest: BaseManifest
-  rootDir: ProjectRootDir
+  dirPath: string
 }
 
 export interface PackageNode<P extends Package> {
@@ -122,7 +144,7 @@ export interface PackageNode<P extends Package> {
 }
 
 export interface PackageGraph<P extends Package> {
-  [id: ProjectRootDir]: PackageNode<P>
+  [id: string]: PackageNode<P>
 }
 
 export interface WorkspaceFilter {
@@ -134,4 +156,21 @@ export interface SupportedArchitectures {
   os?: string[]
   cpu?: string[]
   libc?: string[]
+}
+
+export interface PackageSelector {
+  diff?: string
+  exclude?: boolean
+  excludeSelf?: boolean
+  includeDependencies?: boolean
+  includeDependents?: boolean
+  namePattern?: string
+  parentDir?: string
+  followProdDepsOnly?: boolean
+}
+
+export interface PackageMetadata {
+  manifest: ProjectManifest
+  manifestPath: string
+  dirPath: string
 }
