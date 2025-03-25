@@ -135,7 +135,7 @@ export interface ProjectManifest extends BaseManifest {
 
 export interface Package {
   manifest: BaseManifest
-  rootDir: ProjectRootDir
+  dirPath: string
 }
 
 export interface PackageNode<P extends Package> {
@@ -144,7 +144,7 @@ export interface PackageNode<P extends Package> {
 }
 
 export interface PackageGraph<P extends Package> {
-  [id: ProjectRootDir]: PackageNode<P>
+  [id: string]: PackageNode<P>
 }
 
 export interface WorkspaceFilter {

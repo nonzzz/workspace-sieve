@@ -1,18 +1,12 @@
-// For yarn and pnpm
-// Just a minimal subset implementation. More complex selectors will be add in the future.
 import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
-import type { Package, PackageGraph, ProjectManifest, SupportedArchitectures } from './interface'
+import type { Package, ProjectManifest, SupportedArchitectures } from './interface'
+import { createWorkspacePattern } from './pattern'
 import { checkIsInstallable } from './platform'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
   patterns?: string[]
-  // engineStrict?: boolean
-  // packageManagerStrict?: boolean
-  // packageManagerStrictVersion?: boolean
-  // nodeVersion?: string
-  // sharedWorkspaceLockfile?: boolean
   supportedArchitectures?: SupportedArchitectures
   verbose?: 'info' | 'error' | 'silent'
 }
@@ -102,40 +96,10 @@ export interface FilterWorkspacePackagesOutput {
   unmatchedFilters: string[]
 }
 
-// export async function filterWorkspacePackages<P extends Package>(
-//   workspaceRoot: string,
-//   packageGraph: PackageGraph<P>,
-//   packageSelectors: PackageSelector[]
-// ): Promise<FilterWorkspacePackagesOutput> {
-//   //
-//   const [excludeSelectors, includeSelectors] = packageSelectors.reduce((acc, cur) => {
-//     if (cur.exclude) {
-//       acc[0].push(cur)
-//     } else {
-//       acc[1].push(cur)
-//     }
-//     return acc
-//   }, [[], []] as [PackageSelector[], PackageSelector[]])
-//   // const r = filterGraph.bind(null, packageGraph, { workspaceDir: workspaceRoot })
-//   const include = includeSelectors.length === 0
-//     ? { selected: Object.keys(packageGraph), unmatchedFilters: [] }
-//     : await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, includeSelectors)
-//   const exclude = await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, excludeSelectors)
-//   console.log(include, exclude)
-// }
-
-// interface FilterGraphOptions {
-//   workspaceDir: string
-//   testPattern?: string[]
-//   changedFilesIgnorePattern?: string[]
-//   useGlobDirFiltering?: boolean
-// }
-
-export function filterWorkspacePackagesByGraphics() {
-}
-
+// TODO: handle workspace: * and etc...
 function createWorkspacePackageGraphics(metadata: PackagesMetadata) {
-  //
+  const graphics = metadata.reduce((acc, cur) => (acc[cur.dirPath] = cur, acc), {} as Record<string, Package>)
+  return graphics
 }
 
 export interface FilterOptions extends FindWorkspacePackagesOpts {
@@ -145,74 +109,69 @@ export interface FilterOptions extends FindWorkspacePackagesOpts {
 export interface FilterWorkspaceResult {
   unmatchedFilters: string[]
   matchedProjects: string[]
-  matchedGraphics: PackageGraph<Package>
+  matchedGraphics: Record<string, Package>
 }
 
 export interface FilterWorkspacePackagesFromDirectoryResult extends FilterWorkspaceResult {
   allProjects: PackagesMetadata
 }
 
-export async function filterWorkspacePacakgesFromDirectory(
+export async function filterWorkspacePackagesFromDirectory(
   workspaceRoot: string,
   options?: FilterOptions
 ): Promise<FilterWorkspacePackagesFromDirectoryResult> {
   const { packagesMetadata: allProjects } = await findWorkspacePackages(workspaceRoot, { ...options, verbose: 'error' })
 
-  // const graphics = createWorkspacePackageGraphics(allProjects)
+  const graphics = createWorkspacePackageGraphics(allProjects)
+
   return {
     allProjects,
-    unmatchedFilters: [],
-    matchedProjects: [],
-    matchedGraphics: {}
+    ...filterWorkspacePackagesByGraphics(workspaceRoot, graphics, options?.filter || [])
   }
 }
 
-// async function filterGraph<P extends Package>(pkgGraph: PackageGraph<P>, opts: FilterGraphOptions, packageSelectors: PackageSelector[]) {
-//   const unmatchedFilters: string[] = []
-//   for (const selector of packageSelectors) {
-//     let entryPackages: ProjectRootDir[] | null = null
-//     if (selector.diff) {
-//       //
-//     } else if (selector.parentDir) {
-//       //
-//     }
-//     if (selector.namePattern) {
-//       //
-//     }
+export function filterWorkspacePackagesByGraphics(
+  workspaceRoot: string,
+  packageGraph: Record<string, Package>,
+  patterns: string[]
+): FilterWorkspaceResult {
+  if (!patterns.length) {
+    return {
+      unmatchedFilters: [],
+      matchedProjects: [],
+      matchedGraphics: {}
+    }
+  }
 
-//     if (selector.namePattern) {
-//       if (entryPackages === null) {
-//         entryPackages = matchPackages(pkgGraph, selector.namePattern)
-//         console.log(entryPackages)
-//       } else {
-//         console.log('wata?')
-//         // entryPackages = matchPackages(pkgGraph, selector.namePattern).filter((id) => entryPackages!.includes(id))
-//       }
-//     }
+  const packageIds = Object.keys(packageGraph)
+  const unmatchedFilters = new Set<string>()
+  const matchedProjects = new Set<string>()
+  const matchedGraphics: Record<string, Package> = {}
 
-//     if (entryPackages == null) {
-//       throw new Error(`Unsupported package selector: ${JSON.stringify(selector)}`)
-//     }
+  const combinedMatcher = createWorkspacePattern(patterns)
 
-//     if (Array.isArray(entryPackages) && entryPackages.length === 0) {
-//       if (selector.namePattern) {
-//         unmatchedFilters.push(selector.namePattern)
-//       }
-//     }
-//   }
-//   return {
-//     unmatchedFilters
-//   }
-// }
+  for (const id of packageIds) {
+    const pkgName = packageGraph[id].manifest.name || path.basename(id)
+    if (combinedMatcher(pkgName)) {
+      matchedProjects.add(pkgName)
+      matchedGraphics[pkgName] = packageGraph[id]
+    }
+  }
 
-// function matchPackages<P extends Package>(graph: PackageGraph<P>, pattern: string): ProjectRootDir[] {
-//   const matcher = createWorkspacePattern([pattern])
-//   const matches = (Object.keys(graph) as ProjectRootDir[]).filter((id) =>
-//     graph[id].package.manifest.name && matcher(graph[id].package.manifest.name)
-//   )
-//   if (matches.length === 0 && !(pattern[0] === '@') && !pattern.includes('/')) {
-//     const scopedMatches = matchPackages(graph, `@*/${pattern}`)
-//     return scopedMatches.length !== 1 ? [] : scopedMatches
-//   }
-//   return matches
-// }
+  for (const pattern of patterns) {
+    const singleMatcher = createWorkspacePattern([pattern])
+    const hasMatch = packageIds.some((id) => {
+      const pkgName = packageGraph[id].manifest.name || path.basename(id)
+      return singleMatcher(pkgName)
+    })
+    if (!hasMatch) {
+      unmatchedFilters.add(pattern)
+    }
+  }
+
+  return {
+    unmatchedFilters: Array.from(unmatchedFilters),
+    matchedProjects: Array.from(matchedProjects),
+    matchedGraphics
+  }
+}
