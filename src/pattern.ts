@@ -1,139 +1,71 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// Pattern for workspace syntax
-// **
-// * means wildcards
-// ! means ignore
+type MatcherWithIndex = (input: string) => number
+type Matcher = (input: string) => boolean
 
-type State = 'START' | 'NORMAL' | 'SCOPE' | 'DOUBLE_STAR' | 'MATCH' | 'NO_MATCH'
+export function createWorkspacePattern(patterns: string[]): Matcher {
+  const matcher = createMatcherWithIndex(patterns)
+  return (input) => matcher(input) !== -1
+}
 
-export function createWorkspacePattern(patterns: string[]) {
-  if (!patterns.length) {
-    return (_: string) => false
-  }
+function createMatcherWithIndex(patterns: string[]): MatcherWithIndex {
+  if (patterns.length === 0) { return () => -1 }
+  if (patterns.length === 1) { return createSingleMatcher(patterns[0]) }
 
-  const compiled = patterns.map((p) => ({
-    pattern: p.replace(/^!/, ''),
-    isNegative: p.startsWith('!')
+  const states = patterns.map((pattern) => ({
+    pattern,
+    isNegative: pattern.startsWith('!'),
+    segments: pattern.startsWith('!') ? pattern.slice(1).split('*') : pattern.split('*')
   }))
 
-  return (input: string): boolean => {
-    return compiled.every((p) => p.isNegative !== matchWithState(input, p.pattern))
+  return (input: string) => {
+    let matchedIndex = -1
+
+    for (let i = 0; i < states.length; i++) {
+      const state = states[i]
+      const isMatch = matchSegments(input, state.segments)
+
+      if (state.isNegative) {
+        if (isMatch) { matchedIndex = -1 }
+      } else if (matchedIndex === -1 && isMatch) {
+        matchedIndex = i
+      }
+    }
+
+    return matchedIndex
   }
 }
 
-function matchWithState(input: string, pattern: string): boolean {
-  let state: State = 'START'
-  let inputIdx = 0
-  let patternIdx = 0
-  let backtrackInput = -1
-  let backtrackPattern = -1
+function createSingleMatcher(pattern: string): MatcherWithIndex {
+  if (pattern === '*') { return () => 0 }
 
-  if (pattern === '*') {
-    return true
+  const isNegative = pattern.startsWith('!')
+  const segments = (isNegative ? pattern.slice(1) : pattern).split('*')
+
+  return (input: string) => {
+    const matches = matchSegments(input, segments)
+    if (isNegative) { return matches ? -1 : 0 }
+    return matches ? 0 : -1
+  }
+}
+
+function matchSegments(input: string, segments: string[]): boolean {
+  if (segments.length === 1) { return input === segments[0] }
+
+  let currentPos = 0
+
+  if (segments[0] !== '') {
+    if (!input.startsWith(segments[0])) { return false }
+    currentPos = segments[0].length
   }
 
-  while (inputIdx < input.length) {
-    const inputChar = input[inputIdx]
-    const patternChar = pattern[patternIdx]
-    console.log(inputChar, patternChar, state)
-    switch (state) {
-      case 'START': {
-        if (inputChar === '@' && patternChar === '@') {
-          state = 'SCOPE'
-          inputIdx++
-          patternIdx++
-        } else if (patternChar === '*' && pattern[patternIdx + 1] === '*') {
-          state = 'DOUBLE_STAR'
-          backtrackInput = inputIdx
-          backtrackPattern = patternIdx + 2
-          patternIdx += 2
-        } else if (patternChar === '*') {
-          if (inputChar === '@') {
-            return false
-          }
-          state = 'NORMAL'
-          inputIdx++
-          patternIdx++
-        } else if (inputChar === patternChar) {
-          state = 'NORMAL'
-          inputIdx++
-          patternIdx++
-        } else {
-          return false
-        }
-        break
-      }
+  for (let i = 1; i < segments.length - 1; i++) {
+    const segment = segments[i]
+    if (segment === '') { continue }
 
-      case 'SCOPE': {
-        console.log('wa?')
-        if (inputChar === '/' && patternChar === '/') {
-          state = 'NORMAL'
-          inputIdx++
-          patternIdx++
-        } else if (patternChar === '*') {
-          if (inputChar === '/') {
-            state = 'NORMAL'
-            patternIdx++
-          } else {
-            inputIdx++
-          }
-        } else if (inputChar === patternChar) {
-          inputIdx++
-          patternIdx++
-        } else {
-          return false
-        }
-        break
-      }
-
-      case 'NORMAL': {
-        if (patternIdx >= pattern.length) {
-          return false
-        }
-        if (patternChar === '*' && pattern[patternIdx + 1] === '*') {
-          backtrackInput = inputIdx
-          backtrackPattern = patternIdx + 2
-          patternIdx += 2
-          state = 'DOUBLE_STAR'
-        } else if (patternChar === '*') {
-          inputIdx++
-          patternIdx++
-        } else if (inputChar === patternChar) {
-          inputIdx++
-          patternIdx++
-        } else {
-          if (backtrackInput >= 0) {
-            inputIdx = ++backtrackInput
-            patternIdx = backtrackPattern
-            state = 'DOUBLE_STAR'
-          } else {
-            return false
-          }
-        }
-        break
-      }
-
-      case 'DOUBLE_STAR': {
-        if (patternIdx >= pattern.length) {
-          return true
-        }
-        if (inputChar === pattern[patternIdx]) {
-          state = 'NORMAL'
-        } else {
-          inputIdx++
-        }
-        break
-      }
-    }
+    const idx = input.indexOf(segment, currentPos)
+    if (idx === -1) { return false }
+    currentPos = idx + segment.length
   }
 
-  while (
-    patternIdx < pattern.length &&
-    pattern[patternIdx] === '*' &&
-    pattern[patternIdx + 1] === '*'
-  ) {
-    patternIdx += 2
-  }
-
-  return patternIdx >= pattern.length && inputIdx >= input.length
+  const lastSegment = segments[segments.length - 1]
+  return lastSegment === '' || input.endsWith(lastSegment)
 }
