@@ -3,16 +3,16 @@
 import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
-import type { Package, PackageGraph, PackageSelector, ProjectManifest, ProjectRootDir, SupportedArchitectures } from './interface'
+import type { Package, PackageGraph, ProjectManifest, SupportedArchitectures } from './interface'
 import { checkIsInstallable } from './platform'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
   patterns?: string[]
-  engineStrict?: boolean
-  packageManagerStrict?: boolean
-  packageManagerStrictVersion?: boolean
-  nodeVersion?: string
-  sharedWorkspaceLockfile?: boolean
+  // engineStrict?: boolean
+  // packageManagerStrict?: boolean
+  // packageManagerStrictVersion?: boolean
+  // nodeVersion?: string
+  // sharedWorkspaceLockfile?: boolean
   supportedArchitectures?: SupportedArchitectures
   verbose?: 'info' | 'error' | 'silent'
 }
@@ -23,6 +23,8 @@ export const DEFAULT_IGNORE = [
   '**/test/**',
   '**/tests/**'
 ]
+
+export type PackagesMetadata = Awaited<ReturnType<typeof findWorkspacePackages>>['packagesMetadata']
 
 export async function findWorkspacePackages(wd: string, options?: FindWorkspacePackagesOpts) {
   const globalOpts: GlobOptions = { ...options, cwd: wd, expandDirectories: false }
@@ -100,63 +102,117 @@ export interface FilterWorkspacePackagesOutput {
   unmatchedFilters: string[]
 }
 
-export async function filterWorkspacePackages<P extends Package>(
-  workspaceRoot: string,
-  packageGraph: PackageGraph<P>,
-  packageSelectors: PackageSelector[]
-): Promise<FilterWorkspacePackagesOutput> {
+// export async function filterWorkspacePackages<P extends Package>(
+//   workspaceRoot: string,
+//   packageGraph: PackageGraph<P>,
+//   packageSelectors: PackageSelector[]
+// ): Promise<FilterWorkspacePackagesOutput> {
+//   //
+//   const [excludeSelectors, includeSelectors] = packageSelectors.reduce((acc, cur) => {
+//     if (cur.exclude) {
+//       acc[0].push(cur)
+//     } else {
+//       acc[1].push(cur)
+//     }
+//     return acc
+//   }, [[], []] as [PackageSelector[], PackageSelector[]])
+//   // const r = filterGraph.bind(null, packageGraph, { workspaceDir: workspaceRoot })
+//   const include = includeSelectors.length === 0
+//     ? { selected: Object.keys(packageGraph), unmatchedFilters: [] }
+//     : await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, includeSelectors)
+//   const exclude = await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, excludeSelectors)
+//   console.log(include, exclude)
+// }
+
+// interface FilterGraphOptions {
+//   workspaceDir: string
+//   testPattern?: string[]
+//   changedFilesIgnorePattern?: string[]
+//   useGlobDirFiltering?: boolean
+// }
+
+export function filterWorkspacePackagesByGraphics() {
+}
+
+function createWorkspacePackageGraphics(metadata: PackagesMetadata) {
   //
-  const [excludeSelectors, includeSelectors] = packageSelectors.reduce((acc, cur) => {
-    if (cur.exclude) {
-      acc[0].push(cur)
-    } else {
-      acc[1].push(cur)
-    }
-    return acc
-  }, [[], []] as [PackageSelector[], PackageSelector[]])
-  // const r = filterGraph.bind(null, packageGraph, { workspaceDir: workspaceRoot })
-  const include = includeSelectors.length === 0
-    ? { selected: Object.keys(packageGraph), unmatchedFilters: [] }
-    : await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, includeSelectors)
-  const exclude = await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, excludeSelectors)
 }
 
-interface FilterGraphOptions {
-  workspaceDir: string
-  testPattern?: string[]
-  changedFilesIgnorePattern?: string[]
-  useGlobDirFiltering?: boolean
+export interface FilterOptions extends FindWorkspacePackagesOpts {
+  filter?: string[]
 }
 
-async function filterGraph<P extends Package>(pkgGraph: PackageGraph<P>, opts: FilterGraphOptions, packageSelectors: PackageSelector[]) {
-  const unmatchedFilters: string[] = []
-  for (const selector of packageSelectors) {
-    let entryPackages: ProjectRootDir[] | null = null
-    if (selector.diff) {
-      //
-    } else if (selector.parentDir) {
-      //
-    }
-    if (selector.namePattern) {
-      //
-    }
+export interface FilterWorkspaceResult {
+  unmatchedFilters: string[]
+  matchedProjects: string[]
+  matchedGraphics: PackageGraph<Package>
+}
 
-    if (selector.namePattern) {
-      if (entryPackages === null) {
-        entryPackages = []
-      } else {
-        entryPackages = []
-      }
-    }
+export interface FilterWorkspacePackagesFromDirectoryResult extends FilterWorkspaceResult {
+  allProjects: PackagesMetadata
+}
 
-    if (entryPackages == null) {
-      throw new Error(`Unsupported package selector: ${JSON.stringify(selector)}`)
-    }
+export async function filterWorkspacePacakgesFromDirectory(
+  workspaceRoot: string,
+  options?: FilterOptions
+): Promise<FilterWorkspacePackagesFromDirectoryResult> {
+  const { packagesMetadata: allProjects } = await findWorkspacePackages(workspaceRoot, { ...options, verbose: 'error' })
 
-    if (Array.isArray(entryPackages) && entryPackages.length === 0) {
-      if (selector.namePattern) {
-        unmatchedFilters.push(selector.namePattern)
-      }
-    }
+  // const graphics = createWorkspacePackageGraphics(allProjects)
+  return {
+    allProjects,
+    unmatchedFilters: [],
+    matchedProjects: [],
+    matchedGraphics: {}
   }
 }
+
+// async function filterGraph<P extends Package>(pkgGraph: PackageGraph<P>, opts: FilterGraphOptions, packageSelectors: PackageSelector[]) {
+//   const unmatchedFilters: string[] = []
+//   for (const selector of packageSelectors) {
+//     let entryPackages: ProjectRootDir[] | null = null
+//     if (selector.diff) {
+//       //
+//     } else if (selector.parentDir) {
+//       //
+//     }
+//     if (selector.namePattern) {
+//       //
+//     }
+
+//     if (selector.namePattern) {
+//       if (entryPackages === null) {
+//         entryPackages = matchPackages(pkgGraph, selector.namePattern)
+//         console.log(entryPackages)
+//       } else {
+//         console.log('wata?')
+//         // entryPackages = matchPackages(pkgGraph, selector.namePattern).filter((id) => entryPackages!.includes(id))
+//       }
+//     }
+
+//     if (entryPackages == null) {
+//       throw new Error(`Unsupported package selector: ${JSON.stringify(selector)}`)
+//     }
+
+//     if (Array.isArray(entryPackages) && entryPackages.length === 0) {
+//       if (selector.namePattern) {
+//         unmatchedFilters.push(selector.namePattern)
+//       }
+//     }
+//   }
+//   return {
+//     unmatchedFilters
+//   }
+// }
+
+// function matchPackages<P extends Package>(graph: PackageGraph<P>, pattern: string): ProjectRootDir[] {
+//   const matcher = createWorkspacePattern([pattern])
+//   const matches = (Object.keys(graph) as ProjectRootDir[]).filter((id) =>
+//     graph[id].package.manifest.name && matcher(graph[id].package.manifest.name)
+//   )
+//   if (matches.length === 0 && !(pattern[0] === '@') && !pattern.includes('/')) {
+//     const scopedMatches = matchPackages(graph, `@*/${pattern}`)
+//     return scopedMatches.length !== 1 ? [] : scopedMatches
+//   }
+//   return matches
+// }

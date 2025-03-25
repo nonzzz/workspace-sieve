@@ -1,9 +1,9 @@
 import path from 'path'
 import { describe, expect, it } from 'vitest'
-import { filterWorkspacePackages, findWorkspacePackages } from '../src'
+import { filterWorkspacePacakgesFromDirectory, findWorkspacePackages } from '../src'
 import type { Package, PackageGraph, ProjectRootDir } from '../src/interface'
 
-const PKGS_GRAPH: PackageGraph<Package> = {
+export const PKGS_GRAPH: PackageGraph<Package> = {
   ['/packages/project-0' as ProjectRootDir]: {
     dependencies: ['/packages/project-1', '/project-5'] as ProjectRootDir[],
     package: {
@@ -106,15 +106,6 @@ const PKGS_GRAPH: PackageGraph<Package> = {
 const __dirname = new URL('.', import.meta.url).pathname
 
 describe('Find Workspace Packages', () => {
-  // it('select only package dependencies (excluding the package itself)', () => {
-  //   const { selectedProjectsGraph } = filterWorkspacePackages(PKGS_GRAPH, [
-  //     {
-  //       excludeSelf: true,
-  //       includeDependencies: true,
-  //       namePattern: 'project-1'
-  //     }
-  //   ], { workspaceDir: process.cwd() })
-  // })
   it('basic usage', async () => {
     const manyPkgsPath = path.join(__dirname, 'fixtures/many-pkgs/components')
     const { packagesMetadata } = await findWorkspacePackages(manyPkgsPath)
@@ -142,12 +133,12 @@ describe('Find Workspace Packages', () => {
   })
 })
 
-describe('Filter Workspace Packages', () => {
-  it('selct only package dependencies (excluding the package itself)', async () => {
-    await filterWorkspacePackages(process.cwd(), PKGS_GRAPH, [{
-      excludeSelf: true,
-      includeDependencies: true,
-      namePattern: 'project-1'
-    }])
+describe('Filter Workspace Packages From Directory', () => {
+  it('pattern', async () => {
+    const manyPkgsPath = path.join(__dirname, 'fixtures/many-pkgs')
+    await filterWorkspacePacakgesFromDirectory(manyPkgsPath, {
+      patterns: ['components/*'],
+      filter: ['fold-1']
+    })
   })
 })
