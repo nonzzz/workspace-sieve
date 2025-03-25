@@ -3,7 +3,7 @@
 import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
-import type { Package, PackageGraph, PackageSelector, ProjectManifest, SupportedArchitectures } from './interface'
+import type { Package, PackageGraph, PackageSelector, ProjectManifest, ProjectRootDir, SupportedArchitectures } from './interface'
 import { checkIsInstallable } from './platform'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
@@ -77,7 +77,7 @@ function serializePattern(inputs: string[]) {
   return patterns
 }
 
-//  I can't find any description of the package manifest format in the npm or yarn documentation.
+// I can't find any description of the package manifest format in the npm or yarn documentation.
 // It's a special case for pnpm.
 async function readPackgeMetadata(manifestPath: string) {
   const b = path.basename(manifestPath)
@@ -95,10 +95,68 @@ async function readPackgeMetadata(manifestPath: string) {
   }
 }
 
-export function filterWorkspacePackages<P extends Package>(
+export interface FilterWorkspacePackagesOutput {
+  selected: string[]
+  unmatchedFilters: string[]
+}
+
+export async function filterWorkspacePackages<P extends Package>(
   workspaceRoot: string,
   packageGraph: PackageGraph<P>,
   packageSelectors: PackageSelector[]
-) {
+): Promise<FilterWorkspacePackagesOutput> {
   //
+  const [excludeSelectors, includeSelectors] = packageSelectors.reduce((acc, cur) => {
+    if (cur.exclude) {
+      acc[0].push(cur)
+    } else {
+      acc[1].push(cur)
+    }
+    return acc
+  }, [[], []] as [PackageSelector[], PackageSelector[]])
+  // const r = filterGraph.bind(null, packageGraph, { workspaceDir: workspaceRoot })
+  const include = includeSelectors.length === 0
+    ? { selected: Object.keys(packageGraph), unmatchedFilters: [] }
+    : await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, includeSelectors)
+  const exclude = await filterGraph(packageGraph, { workspaceDir: workspaceRoot }, excludeSelectors)
+}
+
+interface FilterGraphOptions {
+  workspaceDir: string
+  testPattern?: string[]
+  changedFilesIgnorePattern?: string[]
+  useGlobDirFiltering?: boolean
+}
+
+async function filterGraph<P extends Package>(pkgGraph: PackageGraph<P>, opts: FilterGraphOptions, packageSelectors: PackageSelector[]) {
+  const unmatchedFilters: string[] = []
+  for (const selector of packageSelectors) {
+    let entryPackages: ProjectRootDir[] | null = null
+    if (selector.diff) {
+      //
+    } else if (selector.parentDir) {
+      //
+    }
+    if (selector.namePattern) {
+      //
+    }
+
+    if (selector.namePattern) {
+      if (entryPackages === null) {
+        entryPackages = []
+      } else {
+        entryPackages = []
+      }
+    }
+
+    if (entryPackages == null) {
+      throw new Error(`Unsupported package selector: ${JSON.stringify(selector)}`)
+    }
+
+    if (Array.isArray(entryPackages) && entryPackages.length === 0) {
+      if (selector.namePattern) {
+        unmatchedFilters.push(selector.namePattern)
+      }
+    }
+  }
 }
