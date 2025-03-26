@@ -1,6 +1,7 @@
 import path from 'path'
 import { describe, expect, it } from 'vitest'
-import { filterWorkspacePackagesFromDirectory, findWorkspacePackages } from '../src'
+import { filterWorkspacePackagesByGraphics, filterWorkspacePackagesFromDirectory, findWorkspacePackages } from '../src'
+import type { Package } from '../src/interface'
 
 const __dirname = new URL('.', import.meta.url).pathname
 
@@ -49,5 +50,56 @@ describe('Filter Workspace Packages From Directory', () => {
     })
     expect(matchedProjects).toStrictEqual(['find.p', '@scope/find~x'])
     expect(unmatchedFilters).toStrictEqual([])
+  })
+})
+
+describe('Filer Workspace Packages By Graphics', () => {
+  it('scope mode', () => {
+    const graphics: Record<string, Package> = {
+      'components/fold-1': {
+        dirPath: 'components/fold-1',
+        manifest: {
+          name: '@scope/fold-1'
+        }
+      },
+      'components/fold-2': {
+        dirPath: 'components/fold-2',
+        manifest: {
+          name: '@scope/fold-2'
+        }
+      },
+      'components/fold-3': {
+        dirPath: 'components/fold-3',
+        manifest: {
+          name: '@types/fold-3'
+        }
+      }
+    }
+    const { matchedProjects } = filterWorkspacePackagesByGraphics(process.cwd(), graphics, ['@scope/*', '*fold*'])
+    expect(matchedProjects).toStrictEqual(['@scope/fold-1', '@scope/fold-2', '@types/fold-3'])
+  })
+  it('global pattern', () => {
+    const graphics: Record<string, Package> = {
+      'components/fold-1': {
+        dirPath: 'components/fold-1',
+        manifest: {
+          name: '@scope/fold-1'
+        }
+      },
+      'components/fold-2': {
+        dirPath: 'components/fold-2',
+        manifest: {
+          name: '@scope/fold-2'
+        }
+      },
+      'components/fold-3': {
+        dirPath: 'components/fold-3',
+        manifest: {
+          name: '@types/fold-3'
+        }
+      }
+    }
+    const { matchedProjects } = filterWorkspacePackagesByGraphics(process.cwd(), graphics, ['*'])
+    expect(matchedProjects).toStrictEqual(['@scope/fold-1', '@scope/fold-2', '@types/fold-3'])
   })
 })
