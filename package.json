@@ -1,7 +1,19 @@
 {
-  "name": "filter-package",
+  "name": "workspace-sieve",
   "author": "kanno",
   "license": "MIT",
+  "version": "0.1.0",
+  "description": "A flexible workspace package filter for monorepos",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "pnpm exec rollup -c ./rollup.config.mjs",
     "test": "pnpm exec vitest"
@@ -18,6 +30,10 @@
     "typescript": "^5.7.2",
     "vite": "^6.2.2",
     "vitest": "^3.0.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nonzzz/workspace-sieve.git"
   },
   "dependencies": {
     "tinyglobby": "^0.2.12"

@@ -1,3 +1,19 @@
-# Filter Packages
+# Workspace Sieve
 
-Filters packages in a workspace.
+Filter packages in your monorepo
+
+### Install
+
+```bash
+yarn add workspace-sieve
+```
+
+### Usage
+
+```ts
+import { filterWorkspacePackagesFromDirectory } from 'workspace-sieve'
+
+filterWorkspacePackagesFromDirectory(process.cwd(), {
+  patterns: ['*', '**']
+})
+```

@@ -1,4 +1,4 @@
-// We should  respect pnpm's detection of binary files on different platforms.
+// We should respect pnpm's detection of binary files on different platforms.
 import child_process from 'child_process'
 import type { PackageMetadata } from './interface'
 export interface SupportedArchitectures {
