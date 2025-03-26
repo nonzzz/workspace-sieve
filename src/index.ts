@@ -146,23 +146,37 @@ export function filterWorkspacePackagesByGraphics(
   const packageIds = Object.keys(packageGraph)
   const unmatchedFilters = new Set<string>()
   const matchedProjects = new Set<string>()
+  const matchedPaths = new Set<string>()
   const matchedGraphics: Record<string, Package> = {}
 
   const combinedMatcher = createWorkspacePattern(patterns)
 
   for (const id of packageIds) {
-    const pkgName = packageGraph[id].manifest.name || path.basename(id)
-    if (combinedMatcher(pkgName)) {
+    const pkg = packageGraph[id]
+    const pkgName = pkg.manifest.name
+    const dirName = path.basename(pkg.dirPath)
+    if (matchedPaths.has(pkg.dirPath)) {
+      continue
+    }
+    if (pkgName && combinedMatcher(pkgName)) {
       matchedProjects.add(pkgName)
-      matchedGraphics[pkgName] = packageGraph[id]
+      matchedGraphics[dirName] = pkg
+      matchedPaths.add(pkg.dirPath)
+    }
+    if (combinedMatcher(dirName)) {
+      matchedProjects.add(pkgName || dirName)
+      matchedGraphics[dirName] = pkg
+      matchedPaths.add(pkg.dirPath)
     }
   }
 
   for (const pattern of patterns) {
     const singleMatcher = createWorkspacePattern([pattern])
     const hasMatch = packageIds.some((id) => {
-      const pkgName = packageGraph[id].manifest.name || path.basename(id)
-      return singleMatcher(pkgName)
+      const pkg = packageGraph[id]
+      const pkgName = pkg.manifest.name
+      const dirName = path.basename(pkg.dirPath)
+      return (pkgName && singleMatcher(pkgName)) || singleMatcher(dirName)
     })
     if (!hasMatch) {
       unmatchedFilters.add(pattern)

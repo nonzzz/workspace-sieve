@@ -42,4 +42,12 @@ describe('Filter Workspace Packages From Directory', () => {
     expect(unmatchedFilters).toStrictEqual(['fold-3'])
     expect(matchedProjects.length).toBe(0)
   })
+  it('not same name', async () => {
+    const manyPkgsPath = path.join(__dirname, 'fixtures/not-same')
+    const { unmatchedFilters, matchedProjects } = await filterWorkspacePackagesFromDirectory(manyPkgsPath, {
+      filter: ['find-p', '@scope/find~x', 'find.p']
+    })
+    expect(matchedProjects).toStrictEqual(['find.p', '@scope/find~x'])
+    expect(unmatchedFilters).toStrictEqual([])
+  })
 })

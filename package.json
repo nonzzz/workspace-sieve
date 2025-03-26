@@ -2,7 +2,7 @@
   "name": "workspace-sieve",
   "author": "kanno",
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A flexible workspace package filter for monorepos",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
