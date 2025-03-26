@@ -23,7 +23,7 @@ jobs:
 
       - name: Pack and Publish
         run: |
-          pnpm run build && pnpm publish --access public
+          pnpm run build && pnpm publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
