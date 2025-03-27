@@ -2,7 +2,7 @@
   "name": "workspace-sieve",
   "author": "kanno",
   "license": "MIT",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A flexible workspace package filter for monorepos",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -18,6 +18,11 @@
     "build": "pnpm exec rollup -c ./rollup.config.mjs",
     "test": "pnpm exec vitest"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "devDependencies": {
     "@swc/core": "^1.10.4",
     "@types/node": "^22.10.5",
