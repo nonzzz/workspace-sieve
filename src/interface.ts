@@ -1,16 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface ExportFields {
   import?: string
   require?: string
   default?: string
-}
-
-export interface PackageJSONMetadata {
-  type: 'commonjs' | 'module'
-  main?: string
-  module?: string
-  exports?: Record<string, ExportFields | string>
-  [prop: string]: any
 }
 
 export type PackageBin = string | { [commandName: string]: string }
@@ -147,26 +138,10 @@ export interface PackageGraph<P extends Package> {
   [id: string]: PackageNode<P>
 }
 
-export interface WorkspaceFilter {
-  filter: string
-  followProdDepsOnly: boolean
-}
-
 export interface SupportedArchitectures {
   os?: string[]
   cpu?: string[]
   libc?: string[]
-}
-
-export interface PackageSelector {
-  diff?: string
-  exclude?: boolean
-  excludeSelf?: boolean
-  includeDependencies?: boolean
-  includeDependents?: boolean
-  namePattern?: string
-  parentDir?: string
-  followProdDepsOnly?: boolean
 }
 
 export interface PackageMetadata {

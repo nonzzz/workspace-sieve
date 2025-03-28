@@ -189,3 +189,7 @@ export function filterWorkspacePackagesByGraphics(
     matchedGraphics
   }
 }
+
+export { searchForPackageRoot, searchForWorkspaceRoot } from './find-workspace'
+
+export * from './interface'
