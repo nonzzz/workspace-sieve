@@ -23,6 +23,33 @@ filterWorkspacePackagesFromDirectory(process.cwd(), {
 })
 ```
 
+### API's
+
+```ts
+export declare function filterWorkspacePackagesFromDirectory(
+  workspaceRoot: string,
+  options?: FilterOptions
+): Promise<FilterWorkspacePackagesFromDirectoryResult>
+
+export declare function filterWorkspacePackagesByGraphics(
+  workspaceRoot: string,
+  packageGraph: Record<string, Package>,
+  patterns: string[]
+): FilterWorkspaceResult
+
+export declare function searchForPackageRoot(current: string, root?: string): string
+
+export declare function searchForWorkspaceRoot(current: string, root?: string): string
+```
+
+### Sponsors
+
+<p align="center">
+  <a href="https://cdn.jsdelivr.net/gh/nonzzz/sponsors/sponsorkit/sponsors.svg">
+    <img src="https://cdn.jsdelivr.net/gh/nonzzz/sponsors/sponsorkit/sponsors.svg"/>
+  </a>
+</p>
+
 ### Tips
 
 - The implementation result is not consistent with pnpm filter (Not support filter selector for now!!!) Maybe needed if yijie want~
