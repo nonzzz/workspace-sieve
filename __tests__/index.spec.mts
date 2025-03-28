@@ -1,9 +1,10 @@
 import path from 'path'
+import url from 'url'
 import { describe, expect, it } from 'vitest'
 import { filterWorkspacePackagesByGraphics, filterWorkspacePackagesFromDirectory, findWorkspacePackages } from '../src'
 import type { Package } from '../src/interface'
 
-const __dirname = new URL('.', import.meta.url).pathname
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 
 describe('Find Workspace Packages', () => {
   it('basic usage', async () => {
