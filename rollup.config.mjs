@@ -1,5 +1,6 @@
 import replace from '@rollup/plugin-replace'
 import fs from 'fs'
+import path from 'path'
 import { defineConfig } from 'rollup'
 import dts from 'rollup-plugin-dts'
 import { swc } from 'rollup-plugin-swc3'
@@ -13,7 +14,7 @@ export default defineConfig([
     ],
     plugins: [
       replace({
-        b64: JSON.stringify(fs.readFileSync('zig/zig-lib.wasm', 'base64'))
+        b64: JSON.stringify(fs.readFileSync(path.join(process.cwd(), 'zig-out/zig-lib.wasm'), 'base64'))
       }),
       swc()
     ]

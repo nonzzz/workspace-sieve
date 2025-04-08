@@ -11,6 +11,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.13.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -23,7 +26,7 @@ jobs:
 
       - name: Pack and Publish
         run: |
-          pnpm run build && pnpm publish --no-git-checks --access public
+          zig build wasm && pnpm publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
