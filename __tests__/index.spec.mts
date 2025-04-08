@@ -1,7 +1,7 @@
 import path from 'path'
 import url from 'url'
 import { describe, expect, it } from 'vitest'
-import { filterWorkspacePackagesByGraphics, filterWorkspacePackagesFromDirectory, findWorkspacePackages } from '../src'
+import { filterWorkspacePackagesByGraphics, filterWorkspacePackagesFromDirectory, findWorkspacePackages } from '../dist'
 import type { Package } from '../src/interface'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
@@ -76,7 +76,7 @@ describe('Filer Workspace Packages By Graphics', () => {
         }
       }
     }
-    const { matchedProjects } = filterWorkspacePackagesByGraphics(process.cwd(), graphics, ['@scope/*', '*fold*'])
+    const { matchedProjects } = filterWorkspacePackagesByGraphics(graphics, ['@scope/*', '*fold*'], { experimental: true })
     expect(matchedProjects).toStrictEqual(['@scope/fold-1', '@scope/fold-2', '@types/fold-3'])
   })
   it('global pattern', () => {
@@ -100,7 +100,7 @@ describe('Filer Workspace Packages By Graphics', () => {
         }
       }
     }
-    const { matchedProjects } = filterWorkspacePackagesByGraphics(process.cwd(), graphics, ['*'])
+    const { matchedProjects } = filterWorkspacePackagesByGraphics(graphics, ['*'])
     expect(matchedProjects).toStrictEqual(['@scope/fold-1', '@scope/fold-2', '@types/fold-3'])
   })
 })

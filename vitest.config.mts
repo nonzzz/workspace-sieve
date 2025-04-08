@@ -13,6 +13,11 @@ export default defineConfig({
         '**/examples/**',
         '**/dist/**'
       ]
-    }
+    },
+    benchmark: {
+      outputJson: './bench-results.json',
+      include: ['**/__benchmarks__/**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}']
+    },
+    environment: 'node'
   }
 })

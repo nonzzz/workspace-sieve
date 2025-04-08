@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createWorkspacePattern } from '../src/pattern'
+import { createWorkspacePattern, createWorkspacePatternWASM } from '../dist'
 
 interface PatternMatchMatrix {
   matchRule: string[]
@@ -78,6 +78,18 @@ describe('Workspace Pattern Matcher', () => {
       for (const { input, state } of fixture.expected) {
         expect(matcher(input)).toBe(state)
       }
+    }
+  })
+})
+
+describe('WASM Pattern Matcher', () => {
+  it('match matrix', () => {
+    for (const fixture of PATTERN_MATCH_MATRIX) {
+      const matcher = createWorkspacePatternWASM(fixture.matchRule)
+      for (const { input, state } of fixture.expected) {
+        expect(matcher.match(input), `${input} -- ${JSON.stringify(fixture.matchRule)}`).toBe(state)
+      }
+      matcher.dispose()
     }
   })
 })

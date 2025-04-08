@@ -1,1 +1,1 @@
-declare const lexSelector: string
+declare const b64: string
