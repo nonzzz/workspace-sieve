@@ -45,11 +45,15 @@ fn build_wasm(
         },
     )).step);
 
+    const wasm_install_step = b.addInstallArtifact(wasm_generate, .{});
+    step_wasm.dependOn(&wasm_install_step.step);
+
     var write_build_script = b.addSystemCommand(&.{
         "./node_modules/.bin/rollup",
         "-c",
         "rollup.config.mjs",
     });
+    write_build_script.step.dependOn(&wasm_install_step.step);
     step_wasm.dependOn(&write_build_script.step);
 }
 
