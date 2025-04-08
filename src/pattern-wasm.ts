@@ -21,6 +21,8 @@ const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
 
 const INPUT_MEMORY_OFFSET = 1024 * 4
+const INITIAL_BUFFER_SIZE = 8192
+const MAX_BUFFER_SIZE = 1024 * 1024 * 16
 
 function createZigEnv(instanceId: string) {
   return {
@@ -98,25 +100,56 @@ function createMatcher(patterns: string[], debug = false) {
 
   const contextPtr = module.createMatcherContext()
   const { ptr, lengths } = writeStringsToMemory(module, patterns, debugMode)
-  const lengthsArray = new Uint32Array(patterns.length)
-  lengths.forEach((len, i) => {
-    lengthsArray[i] = len
-  })
+
+  const lengthsArray = new Uint32Array(lengths)
   const lengthsPtr = INPUT_MEMORY_OFFSET + 2048
-  const mem = new Uint8Array(module.memory.buffer)
+  let mem = new Uint8Array(module.memory.buffer)
   mem.set(new Uint8Array(lengthsArray.buffer), lengthsPtr)
+
   const matcherId = module.initMatcher(contextPtr, ptr, lengthsPtr, patterns.length)
+
+  let bufferSize = INITIAL_BUFFER_SIZE
+  let inputBuffer: Uint8Array | null = new Uint8Array(bufferSize)
+
   return {
     match: (input: string): boolean => {
-      const b = textEncoder.encode(input)
-      const mem = new Uint8Array(module.memory.buffer)
-      mem.set(b, INPUT_MEMORY_OFFSET)
-      return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, b.length)
+      const estimatedSize = input.length * 4 // UTF-8 can be up to 4 bytes per char
+
+      if (estimatedSize > bufferSize && estimatedSize < MAX_BUFFER_SIZE) {
+        bufferSize = Math.min(MAX_BUFFER_SIZE, Math.pow(2, Math.ceil(Math.log2(estimatedSize))))
+        inputBuffer = new Uint8Array(bufferSize)
+      }
+
+      let encodedLen: number
+
+      if (estimatedSize <= bufferSize) {
+        const result = textEncoder.encodeInto(input, inputBuffer!)
+        encodedLen = result.written || 0
+      } else {
+        const encoded = textEncoder.encode(input)
+        encodedLen = encoded.length
+
+        if (mem.buffer !== module.memory.buffer) {
+          mem = new Uint8Array(module.memory.buffer)
+        }
+
+        mem.set(encoded, INPUT_MEMORY_OFFSET)
+        return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, encodedLen)
+      }
+
+      if (mem.buffer !== module.memory.buffer) {
+        mem = new Uint8Array(module.memory.buffer)
+      }
+
+      mem.set(inputBuffer!.subarray(0, encodedLen), INPUT_MEMORY_OFFSET)
+      return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, encodedLen)
     },
+
     dispose: () => {
       module.disposeMatcher(contextPtr, matcherId)
       module.destroyMatcherContext(contextPtr)
       instances.delete(instanceId)
+      inputBuffer = null
     }
   }
 }
