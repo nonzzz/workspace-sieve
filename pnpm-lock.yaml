@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      tinyglobby:
-        specifier: ^0.2.12
-        version: 0.2.12
     devDependencies:
       '@rollup/plugin-replace':
         specifier: ^6.0.2
@@ -45,6 +41,9 @@ importers:
       tinybench:
         specifier: ^4.0.1
         version: 4.0.1
+      tinyglobby:
+        specifier: ^0.2.12
+        version: 0.2.12
       typescript:
         specifier: ^5.7.2
         version: 5.7.2
