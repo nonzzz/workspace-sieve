@@ -37,7 +37,9 @@
     "tinybench": "^4.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.2.2",
-    "vitest": "^3.0.9",
+    "vitest": "^3.0.9"
+  },
+  "dependencies": {
     "tinyglobby": "^0.2.12"
   },
   "repository": {
