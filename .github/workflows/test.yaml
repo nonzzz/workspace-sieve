@@ -31,7 +31,7 @@ jobs:
       - name: Setup corepack
         run: corepack enable && pnpm install
       - name: Build Project
-        run: zig build wasm
+        run: zig build lib
       - name: Run Test
         run: pnpm run test
 

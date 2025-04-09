@@ -26,7 +26,7 @@ jobs:
 
       - name: Pack and Publish
         run: |
-          zig build wasm && pnpm publish --no-git-checks --access public
+          zig build lib && pnpm publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
