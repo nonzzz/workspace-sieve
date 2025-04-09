@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createWorkspacePattern, createWorkspacePatternWASM } from '../dist'
+import { createWorkspacePatternWASM } from '../dist'
 
 interface PatternMatchMatrix {
   matchRule: string[]
@@ -70,17 +70,6 @@ const PATTERN_MATCH_MATRIX: PatternMatchMatrix[] = [
     ]
   }
 ]
-
-describe('Workspace Pattern Matcher', () => {
-  it('match matrix', () => {
-    for (const fixture of PATTERN_MATCH_MATRIX) {
-      const matcher = createWorkspacePattern(fixture.matchRule)
-      for (const { input, state } of fixture.expected) {
-        expect(matcher(input)).toBe(state)
-      }
-    }
-  })
-})
 
 describe('WASM Pattern Matcher', () => {
   it('match matrix', () => {

@@ -1,5 +1,5 @@
-import { bench, describe } from 'vitest'
-import { createWorkspacePattern, createWorkspacePatternWASM } from '../dist'
+import { afterAll, bench, describe } from 'vitest'
+import { createWorkspacePatternWASM } from '../dist'
 
 interface PatternMatchMatrix {
   matchRule: string[]
@@ -64,14 +64,7 @@ const BENCHMARK_INPUTS = generateInputs(10000)
 
 describe('Pattern Matcher Benchmark', () => {
   describe('Simple Pattern Matching', () => {
-    const jsSimpleMatcher = createWorkspacePattern(['eslint-*'])
     const wasmSimpleMatcher = createWorkspacePatternWASM(['eslint-*'])
-
-    bench('JS Implementation', () => {
-      for (const input of BENCHMARK_INPUTS) {
-        jsSimpleMatcher(input)
-      }
-    })
 
     bench('WASM Implementation', () => {
       for (const input of BENCHMARK_INPUTS) {
@@ -79,21 +72,14 @@ describe('Pattern Matcher Benchmark', () => {
       }
     })
 
-    bench.todo('Cleanup', () => {
+    afterAll(() => {
       wasmSimpleMatcher.dispose()
     })
   })
 
   describe('Complex Pattern Matching', () => {
     const complexPattern = ['eslint-*', '!eslint-plugin-*', 'eslint-plugin-react', '*loader']
-    const jsComplexMatcher = createWorkspacePattern(complexPattern)
     const wasmComplexMatcher = createWorkspacePatternWASM(complexPattern)
-
-    bench('JS Implementation', () => {
-      for (const input of BENCHMARK_INPUTS) {
-        jsComplexMatcher(input)
-      }
-    })
 
     bench('WASM Implementation', () => {
       for (const input of BENCHMARK_INPUTS) {
@@ -101,22 +87,12 @@ describe('Pattern Matcher Benchmark', () => {
       }
     })
 
-    bench.todo('Cleanup', () => {
+    afterAll(() => {
       wasmComplexMatcher.dispose()
     })
   })
 
   describe('Multiple Matchers Concurrency', () => {
-    bench('JS Implementation', () => {
-      const matchers = PATTERN_MATCH_MATRIX.map((fixture) => createWorkspacePattern(fixture.matchRule))
-
-      for (const matcher of matchers) {
-        for (const input of BENCHMARK_INPUTS) {
-          matcher(input)
-        }
-      }
-    })
-
     bench('WASM Implementation', () => {
       const matchers = PATTERN_MATCH_MATRIX.map((fixture) => createWorkspacePatternWASM(fixture.matchRule))
 

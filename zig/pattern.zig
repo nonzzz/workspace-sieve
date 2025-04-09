@@ -194,6 +194,13 @@ test "Workspace Pattern" {
                 .{ .input = "eslint-plugin-bar", .expected = true },
             },
         },
+        .{
+            .match_rules = &[_][]const u8{ "!fold-1", "fold-3" },
+            .test_cases = &[_]PatternTestCase{
+                .{ .input = "fold-2", .expected = false },
+                .{ .input = "fold-1", .expected = false },
+            },
+        },
     };
 
     for (fixture_matrix) |fixture| {

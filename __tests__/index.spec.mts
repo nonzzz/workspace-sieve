@@ -39,9 +39,10 @@ describe('Filter Workspace Packages From Directory', () => {
     const manyPkgsPath = path.join(__dirname, 'fixtures/many-pkgs')
     const { unmatchedFilters, matchedProjects } = await filterWorkspacePackagesFromDirectory(manyPkgsPath, {
       patterns: ['components/*'],
-      filter: ['!fold-1', 'fold-3']
+      filter: ['!fold-1', 'fold-3'],
+      experimental: { debug: false }
     })
-    expect(unmatchedFilters).toStrictEqual(['fold-3'])
+    expect(unmatchedFilters).toStrictEqual(['!fold-1', 'fold-3'])
     expect(matchedProjects.length).toBe(0)
   })
   it('not same name', async () => {
@@ -76,7 +77,7 @@ describe('Filer Workspace Packages By Graphics', () => {
         }
       }
     }
-    const { matchedProjects } = filterWorkspacePackagesByGraphics(graphics, ['@scope/*', '*fold*'], { experimental: true })
+    const { matchedProjects } = filterWorkspacePackagesByGraphics(graphics, ['@scope/*', '*fold*'], { experimental: { debug: false } })
     expect(matchedProjects).toStrictEqual(['@scope/fold-1', '@scope/fold-2', '@types/fold-3'])
   })
   it('global pattern', () => {

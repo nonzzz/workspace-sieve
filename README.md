@@ -16,7 +16,7 @@ import { filterWorkspacePackagesFromDirectory } from 'workspace-sieve'
 interface FilterOptions {
   patterns: string[] // patterns mean the workspaces you need to match
   filter?: string[] // filter means the packages that need be filtered out in the workplace (based on the patterns matched result)
-  experimental?: boolean | { debug: boolean }
+  experimental?: { debug: boolean }
 }
 
 filterWorkspacePackagesFromDirectory(process.cwd(), {
@@ -35,7 +35,7 @@ export declare function filterWorkspacePackagesFromDirectory(
 export declare function filterWorkspacePackagesByGraphics(
   packageGraph: Record<string, Package>,
   patterns: string[],
-  options?: { experimental?: boolean | { debug: boolean } }
+  options?: { experimental?: { debug: boolean } }
 ): FilterWorkspaceResult
 
 export declare function searchForPackageRoot(current: string, root?: string): string

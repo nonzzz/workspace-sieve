@@ -2,8 +2,7 @@ import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
 import type { Package, ProjectManifest, SupportedArchitectures } from './interface'
-import { createWorkspacePattern } from './pattern'
-import { createWorkspacePatternWASM } from './pattern-wasm'
+import { createWorkspacePatternWASM } from './pattern'
 import { checkIsInstallable } from './platform'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
@@ -105,7 +104,7 @@ function createWorkspacePackageGraphics(metadata: PackagesMetadata) {
 
 export interface FilterOptions extends FindWorkspacePackagesOpts {
   filter?: string[]
-  experimental?: boolean | { debug: boolean }
+  experimental?: { debug: boolean }
 }
 
 export interface FilterWorkspaceResult {
@@ -133,17 +132,7 @@ export async function filterWorkspacePackagesFromDirectory(
 }
 
 export interface FilterWorkspacePackagesByGraphicsOptions {
-  experimental?: boolean | { debug: boolean }
-}
-
-function createUniversalWorkspacePattern(patterns: string[], experimental?: boolean | { debug: boolean }) {
-  if (typeof experimental === 'object' && 'debug' in experimental || experimental) {
-    return createWorkspacePatternWASM(patterns, typeof experimental === 'object' && 'debug' in experimental ? experimental.debug : false)
-  }
-  return {
-    match: createWorkspacePattern(patterns),
-    dispose: () => {}
-  }
+  experimental?: { debug: boolean }
 }
 
 export function filterWorkspacePackagesByGraphics(
@@ -165,7 +154,7 @@ export function filterWorkspacePackagesByGraphics(
   const matchedPaths = new Set<string>()
   const matchedGraphics: Record<string, Package> = {}
 
-  const combinedMatcher = createUniversalWorkspacePattern(patterns, options?.experimental)
+  const combinedMatcher = createWorkspacePatternWASM(patterns, options?.experimental?.debug || false)
 
   for (const id of packageIds) {
     const pkg = packageGraph[id]
@@ -188,7 +177,7 @@ export function filterWorkspacePackagesByGraphics(
   combinedMatcher.dispose()
 
   for (const pattern of patterns) {
-    const singleMatcher = createUniversalWorkspacePattern([pattern], options?.experimental)
+    const singleMatcher = createWorkspacePatternWASM([pattern], options?.experimental?.debug || false)
     const hasMatch = packageIds.some((id) => {
       const pkg = packageGraph[id]
       const pkgName = pkg.manifest.name
@@ -209,7 +198,6 @@ export function filterWorkspacePackagesByGraphics(
 }
 
 export { searchForPackageRoot, searchForWorkspaceRoot } from './find-workspace'
-export { createWorkspacePattern } from './pattern'
-export { createWorkspacePatternWASM } from './pattern-wasm'
+export { createWorkspacePatternWASM } from './pattern'
 
 export * from './interface'
