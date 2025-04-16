@@ -45,15 +45,12 @@ fn build_lib(
         },
     )).step);
 
-    const lib_install_step = b.addInstallArtifact(lib_generate, .{});
-    step_wasm.dependOn(&lib_install_step.step);
-
     var write_build_script = b.addSystemCommand(&.{
         "./node_modules/.bin/rollup",
         "-c",
         "rollup.config.mjs",
     });
-    write_build_script.step.dependOn(&lib_install_step.step);
+    write_build_script.step.dependOn(&lib_generate.step);
     step_wasm.dependOn(&write_build_script.step);
 }
 
