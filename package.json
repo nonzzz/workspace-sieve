@@ -37,10 +37,12 @@
     "tinybench": "^4.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.2.2",
-    "vitest": "^3.0.9"
+    "vitest": "^3.0.9",
+    "@rollup/plugin-node-resolve": "^16.0.1"
   },
   "dependencies": {
-    "tinyglobby": "^0.2.12"
+    "tinyglobby": "^0.2.12",
+    "ansis": "^3.17.0"
   },
   "repository": {
     "type": "git",

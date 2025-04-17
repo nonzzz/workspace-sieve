@@ -1,27 +1,10 @@
 const std = @import("std");
 const pattern = @import("./pattern.zig");
+const logger = @import("./logger.zig");
 
 const Allocator = std.mem.Allocator;
 
-extern "env" fn logString(ptr: [*]const u8, len: usize) void;
-extern "env" fn logBytes(ptr: [*]const u8, len: usize) void;
-extern "env" fn isDebugEnabled() bool;
-
-fn is_debug_mode() bool {
-    return isDebugEnabled();
-}
-
-fn debug_print(allocator: Allocator, comptime fmt: []const u8, args: anytype) void {
-    if (!is_debug_mode()) return;
-    const debug_text = std.fmt.allocPrint(allocator, fmt, args) catch return;
-    defer allocator.free(debug_text);
-    logString(debug_text.ptr, debug_text.len);
-}
-
-fn debug_bytes(bytes: []const u8) void {
-    if (!is_debug_mode()) return;
-    logBytes(bytes.ptr, bytes.len);
-}
+extern "env" fn _print_js_str(addr: [*]const u8, len: usize) void;
 
 pub const MatcherContext = struct {
     allocator: Allocator,
@@ -77,10 +60,16 @@ pub const MatcherContext = struct {
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var global_allocator = gpa.allocator();
 
+var global_logger: logger.Logger = undefined;
+
+export fn initLogger() void {
+    global_logger = logger.Logger.init(global_allocator, _print_js_str);
+}
+
 export fn createMatcherContext() usize {
     const context = global_allocator.create(MatcherContext) catch unreachable;
     context.* = MatcherContext.init(global_allocator);
-    debug_print(global_allocator, "Context created at address: {d}", .{@intFromPtr(context)});
+    global_logger.debug("Context created at address: {d}", .{@intFromPtr(context)});
     return @intFromPtr(context);
 }
 
@@ -108,9 +97,10 @@ export fn initMatcher(
         const len = lengths[i];
         const pattern_slice = patterns_ptr[offset .. offset + len];
 
-        debug_print(global_allocator, "Pattern {d} bytes:", .{i});
-        debug_bytes(pattern_slice);
-        debug_print(global_allocator, "Pattern {d}: '{s}' (len={d})", .{ i, pattern_slice, len });
+        global_logger.debug("Receiver pattern from client: {d}: '{s}'", .{
+            i,
+            pattern_slice,
+        });
 
         patterns_list.append(global_allocator.dupe(u8, pattern_slice) catch unreachable) catch unreachable;
         offset += len + 1; // +1 for null terminator
@@ -122,9 +112,9 @@ export fn initMatcher(
 export fn matchPattern(context_ptr: usize, matcher_id: u32, input_ptr: [*]const u8, input_len: usize) bool {
     var context = @as(*MatcherContext, @ptrFromInt(context_ptr));
     const input = input_ptr[0..input_len];
-    debug_print(global_allocator, "Matching input: '{s}' (len={d})", .{ input, input_len });
+    global_logger.debug("Matching input str: '{s}' (len={d})", .{ input, input_len });
     const result = context.match(matcher_id, input);
-    debug_print(global_allocator, "Match result: {}", .{result});
+    global_logger.debug("Maching result: {}", .{result});
     return result;
 }
 

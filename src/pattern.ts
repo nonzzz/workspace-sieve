@@ -1,8 +1,9 @@
-// Pattern wasm ver
+import ansis from 'ansis'
 
 interface PatternWASM {
   memory: WebAssembly.Memory
   createMatcherContext: () => number
+  initLogger: () => void
   destroyMatcherContext: (contextPtr: number) => void
   initMatcher: (contextPtr: number, patternsPtr: number, patternsLen: number, count: number) => number
   matchPattern: (contextPtr: number, matcherId: number, inputPtr: number, inputLen: number) => number
@@ -24,30 +25,44 @@ const INPUT_MEMORY_OFFSET = 1024 * 4
 const INITIAL_BUFFER_SIZE = 8192
 const MAX_BUFFER_SIZE = 1024 * 1024 * 16
 
-function createZigEnv(instanceId: string) {
-  return {
-    logString: (ptr: number, len: number) => {
-      const instance = instances.get(instanceId)
-      if (!instance || !instance.debugMode) { return }
-      const memory = new Uint8Array(instance.module.memory.buffer)
-      const logText = textDecoder.decode(memory.subarray(ptr, ptr + len))
-      console.log(`[Instance ${instanceId} DEBUG]: ${logText}`)
-    },
-    logBytes: (ptr: number, len: number) => {
-      const instance = instances.get(instanceId)
-      if (!instance || !instance.debugMode) { return }
+interface ZigENV extends WebAssembly.ModuleImports {
+  _print_js_str: (ptr: number, len: number) => void
+}
 
-      const memory = new Uint8Array(instance.module.memory.buffer)
-      const bytes = Array.from(memory.subarray(ptr, ptr + len))
-      console.log(
-        `[Instance ${instanceId} BYTES]: ${bytes.join(', ')} (ASCII: '${
-          bytes.map((b) => b >= 32 && b < 127 ? String.fromCharCode(b) : '.').join('')
-        }')`
-      )
-    },
-    isDebugEnabled: () => {
-      const instance = instances.get(instanceId)
-      return instance ? instance.debugMode : false
+type LoggerLevel = 0 | 1 | 2 | 3
+
+const LOG_LEVEL_ANSIS: Record<LoggerLevel, { icon: string, color: typeof ansis }> = {
+  0: { icon: '\u2699', color: ansis.cyan },
+  1: { icon: '\u2714', color: ansis.green },
+  2: { icon: '\u26A0', color: ansis.yellow },
+  3: { icon: '\u2716', color: ansis.red }
+}
+
+function createZigEnv(instanceId: string) {
+  let instance: Instance | undefined
+
+  const not = () => !instance || !instance.debugMode
+
+  const getInstance = (i: Instance | undefined): i is Instance => {
+    if (!instance) {
+      instance = instances.get(instanceId)
+      if (not()) {
+        return false
+      }
+    }
+    return !not()
+  }
+
+  return <ZigENV> {
+    _print_js_str: (ptr, len) => {
+      if (!getInstance(instance)) {
+        return
+      }
+      const mem = new Uint8Array(instance.module.memory.buffer)
+      const message = textDecoder.decode(mem.subarray(ptr, ptr + len))
+      const [levelStr, content] = message.split('|')
+      const { color, icon } = LOG_LEVEL_ANSIS[+levelStr as LoggerLevel]
+      console.log(`${icon} ${color(content)}`)
     }
   }
 }
@@ -97,7 +112,7 @@ function writeStringsToMemory(
 
 function createMatcher(patterns: string[], debug = false) {
   const { instanceId, module, debug: debugMode } = loadWASM(debug)
-
+  module.initLogger()
   const contextPtr = module.createMatcherContext()
   const { ptr, lengths } = writeStringsToMemory(module, patterns, debugMode)
 
