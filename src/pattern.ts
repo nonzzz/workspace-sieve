@@ -22,13 +22,15 @@ const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
 
 const INPUT_MEMORY_OFFSET = 1024 * 4
-const INITIAL_BUFFER_SIZE = 8192
-const MAX_BUFFER_SIZE = 1024 * 1024 * 16
+
+const WASM_PAGE_SIZE = 1024 * 64
+const OFFSET_PADDING = 1024
+const MAX_RAW_TEXT_SIZE = 1024 * 1024 * 16
 
 interface ZigENV extends WebAssembly.ModuleImports {
   _print_js_str: (ptr: number, len: number) => void
 }
-
+// Detailed definition is in the zig/logger.zig file
 type LoggerLevel = 0 | 1 | 2 | 3
 
 const LOG_LEVEL_ANSIS: Record<LoggerLevel, { icon: string, color: typeof ansis }> = {
@@ -67,10 +69,16 @@ function createZigEnv(instanceId: string) {
   }
 }
 
+let compiledWASM: WebAssembly.Module | undefined
+
 function loadWASM(debug: boolean) {
   const instanceId = `wasm_${++instanceCounter}`
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
-  const compiled = new WebAssembly.Module(bytes)
+
+  if (!compiledWASM) {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+    compiledWASM = new WebAssembly.Module(bytes)
+  }
+  const compiled = compiledWASM
   const env = createZigEnv(instanceId)
   const module = new WebAssembly.Instance(compiled, { env }).exports as unknown as PatternWASM
   instances.set(instanceId, {
@@ -81,90 +89,81 @@ function loadWASM(debug: boolean) {
   return { instanceId, module, debug }
 }
 
-function writeStringsToMemory(
-  module: PatternWASM,
-  strings: string[],
-  debugMode: boolean
-): { ptr: number, lengths: number[] } {
-  const memoryOffset = 1024
-  const mem = new Uint8Array(module.memory.buffer)
-  const lengths: number[] = []
+// In zig part, the str is defined as a slice in C style.
+function initMatcherContext(module: PatternWASM, patterns: string[], debug = false) {
+  const maxPatternLen = Math.max(...patterns.map((p) => p.length))
+  const maxPatternLenBytes = Math.ceil(maxPatternLen / WASM_PAGE_SIZE) * WASM_PAGE_SIZE
+  const maxRawTextSize = Math.min(MAX_RAW_TEXT_SIZE, maxPatternLenBytes)
 
-  const encodedStrings = strings.map((str) => textEncoder.encode(str))
+  if (maxPatternLen > maxRawTextSize) {
+    throw new Error(`Pattern length exceeds maximum size of ${maxRawTextSize} bytes`)
+  }
+  // grow memory
+  const growSize = Math.ceil((maxPatternLen + OFFSET_PADDING) / WASM_PAGE_SIZE)
 
-  let offset = memoryOffset
-  for (const encoded of encodedStrings) {
-    mem.set(encoded, offset)
-    mem[offset + encoded.length] = 0 // null terminator
-    lengths.push(encoded.length)
-
-    if (debugMode) {
-      const written = Array.from(mem.slice(offset, offset + encoded.length))
-        .map((b) => String.fromCharCode(b)).join('')
-      console.log(`[JS Written]: "${written}"`)
+  if (growSize > 1) {
+    module.memory.grow(growSize)
+    if (debug) {
+      console.log(`Memory grown by ${growSize} pages (${growSize * WASM_PAGE_SIZE} bytes)`)
     }
-
-    offset += encoded.length + 1
   }
 
-  return { ptr: memoryOffset, lengths }
+  module.initLogger()
+  const contextPtr = module.createMatcherContext()
+  const mem = new Uint8Array(module.memory.buffer)
+  //  0-1024 maybe wasm reserved characters.
+  let offset = OFFSET_PADDING
+  const lengths = new Uint32Array(patterns.length)
+
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i]
+    const encoded = textEncoder.encode(pattern)
+    mem.set(encoded, offset)
+    mem[offset + encoded.length] = 0 // null terminator
+    lengths[i] = encoded.length
+    offset += encoded.length + 1
+  }
+  const lengthsPtr = INPUT_MEMORY_OFFSET + 2048
+  mem.set(new Uint8Array(lengths.buffer), lengthsPtr)
+
+  const matcherId = module.initMatcher(contextPtr, OFFSET_PADDING, lengthsPtr, patterns.length)
+  return { matcherId, contextPtr }
 }
 
 function createMatcher(patterns: string[], debug = false) {
   const { instanceId, module, debug: debugMode } = loadWASM(debug)
-  module.initLogger()
-  const contextPtr = module.createMatcherContext()
-  const { ptr, lengths } = writeStringsToMemory(module, patterns, debugMode)
+  const { matcherId, contextPtr } = initMatcherContext(module, patterns, debugMode)
 
-  const lengthsArray = new Uint32Array(lengths)
-  const lengthsPtr = INPUT_MEMORY_OFFSET + 2048
-  let mem = new Uint8Array(module.memory.buffer)
-  mem.set(new Uint8Array(lengthsArray.buffer), lengthsPtr)
-
-  const matcherId = module.initMatcher(contextPtr, ptr, lengthsPtr, patterns.length)
-
-  let bufferSize = INITIAL_BUFFER_SIZE
-  let inputBuffer: Uint8Array | null = new Uint8Array(bufferSize)
+  let lastMatcherRawTextSize = 0
 
   return {
     match: (input: string): boolean => {
-      const estimatedSize = input.length * 4 // UTF-8 can be up to 4 bytes per char
-
-      if (estimatedSize > bufferSize && estimatedSize < MAX_BUFFER_SIZE) {
-        bufferSize = Math.min(MAX_BUFFER_SIZE, Math.pow(2, Math.ceil(Math.log2(estimatedSize))))
-        inputBuffer = new Uint8Array(bufferSize)
+      const maxInputLenBytes = Math.ceil(input.length / WASM_PAGE_SIZE) * WASM_PAGE_SIZE
+      const maxRawTextSize = Math.min(MAX_RAW_TEXT_SIZE, maxInputLenBytes)
+      if (maxInputLenBytes > maxRawTextSize) {
+        throw new Error(`Input length exceeds maximum size of ${maxRawTextSize} bytes`)
       }
-
-      let encodedLen: number
-
-      if (estimatedSize <= bufferSize) {
-        const result = textEncoder.encodeInto(input, inputBuffer!)
-        encodedLen = result.written || 0
-      } else {
-        const encoded = textEncoder.encode(input)
-        encodedLen = encoded.length
-
-        if (mem.buffer !== module.memory.buffer) {
-          mem = new Uint8Array(module.memory.buffer)
+      const len = maxInputLenBytes + OFFSET_PADDING
+      const growSize = Math.ceil((maxInputLenBytes + OFFSET_PADDING) / WASM_PAGE_SIZE)
+      if (growSize > 1 && len > lastMatcherRawTextSize) {
+        module.memory.grow(growSize)
+        if (debugMode) {
+          console.log(`Memory grown by ${growSize} pages (${growSize * WASM_PAGE_SIZE} bytes)`)
         }
-
-        mem.set(encoded, INPUT_MEMORY_OFFSET)
-        return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, encodedLen)
+        lastMatcherRawTextSize = len
       }
+      const mem = new Uint8Array(module.memory.buffer)
 
-      if (mem.buffer !== module.memory.buffer) {
-        mem = new Uint8Array(module.memory.buffer)
-      }
+      const { written } = textEncoder.encodeInto(input, mem.subarray(INPUT_MEMORY_OFFSET, INPUT_MEMORY_OFFSET + maxRawTextSize))
 
-      mem.set(inputBuffer!.subarray(0, encodedLen), INPUT_MEMORY_OFFSET)
-      return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, encodedLen)
+      return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, written)
     },
 
     dispose: () => {
       module.disposeMatcher(contextPtr, matcherId)
       module.destroyMatcherContext(contextPtr)
       instances.delete(instanceId)
-      inputBuffer = null
+      lastMatcherRawTextSize = 0
     }
   }
 }
