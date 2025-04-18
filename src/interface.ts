@@ -8,8 +8,6 @@ export type PackageBin = string | { [commandName: string]: string }
 
 export type Dependencies = Record<string, string>
 
-export type ProjectRootDir = string & { __brand: 'ProjectRootDir' }
-
 export type PackageScripts = {
   [name: string]: string
 } & {
@@ -136,12 +134,6 @@ export interface PackageNode<P extends Package> {
 
 export interface PackageGraph<P extends Package> {
   [id: string]: PackageNode<P>
-}
-
-export interface SupportedArchitectures {
-  os?: string[]
-  cpu?: string[]
-  libc?: string[]
 }
 
 export interface PackageMetadata {
