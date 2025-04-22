@@ -144,7 +144,6 @@ function createMatcher(mod: Ref<Mod>, patterns: string[]) {
       for (let i = 0; i < patternsLenView.length; i++) {
         mem[patternsLenPtr + i] = patternsLenView[i]
       }
-      const mem = new Uint8Array(module.memory.buffer)
 
       const inputPtr = patternsLenPtr + patternsLenView.length
 
