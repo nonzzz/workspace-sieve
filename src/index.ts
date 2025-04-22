@@ -1,13 +1,11 @@
 import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
-import type { Package, ProjectManifest, SupportedArchitectures } from './interface'
+import type { Package, ProjectManifest } from './interface'
 import { createWorkspacePatternWASM } from './pattern'
-import { checkIsInstallable } from './platform'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
   patterns?: string[]
-  supportedArchitectures?: SupportedArchitectures
   verbose?: 'info' | 'error' | 'silent'
 }
 
@@ -32,43 +30,13 @@ export async function findWorkspacePackages(wd: string, options?: FindWorkspaceP
   const paths = globSync(patterns, globalOpts)
   const serializedManifestPaths = unique(paths.map((p) => path.join(wd, p)).sort((a, b) => a > b ? 1 : a < b ? -1 : 0))
   const packagesMetadata = await Promise.all(serializedManifestPaths.map(readPackgeMetadata))
-  const supportedArchitectures = Object.assign({
-    os: ['current'],
-    cpu: ['current'],
-    libc: ['current']
-  }, options?.supportedArchitectures)
-  const errorMsgs: Error[] = []
-  try {
-    for (const metadata of packagesMetadata) {
-      checkIsInstallable(metadata, supportedArchitectures)
-    }
-  } catch (e) {
-    if (options?.verbose) {
-      switch (options.verbose) {
-        case 'info': {
-          console.error(e)
-          break
-        }
-        case 'error': {
-          errorMsgs.push(e as Error)
-          break
-        }
-      }
-    }
-  }
-  return { packagesMetadata, errorMsgs }
+  return { packagesMetadata }
 }
 
 function serializePattern(inputs: string[]) {
   const patterns = []
   for (const pattern of inputs) {
     patterns.push(pattern.replace(/\/?$/, '/package.json'))
-    patterns.push(
-      pattern.replace(/\/?$/, '/package.json5')
-    )
-    patterns.push(
-      pattern.replace(/\/?$/, '/package.yaml')
-    )
   }
   return patterns
 }
@@ -153,6 +121,7 @@ export function filterWorkspacePackagesByGraphics(
   const matchedProjects = new Set<string>()
   const matchedPaths = new Set<string>()
   const matchedGraphics: Record<string, Package> = {}
+  const patternMatches = new Map<string, boolean>()
 
   const combinedMatcher = createWorkspacePatternWASM(patterns, options?.experimental?.debug || false)
 
@@ -160,34 +129,40 @@ export function filterWorkspacePackagesByGraphics(
     const pkg = packageGraph[id]
     const pkgName = pkg.manifest.name
     const dirName = path.basename(pkg.dirPath)
-    if (matchedPaths.has(pkg.dirPath)) {
-      continue
-    }
+
+    if (matchedPaths.has(pkg.dirPath)) { continue }
+
+    let isMatched = false
     if (pkgName && combinedMatcher.match(pkgName)) {
       matchedProjects.add(pkgName)
       matchedGraphics[dirName] = pkg
       matchedPaths.add(pkg.dirPath)
+      isMatched = true
     }
     if (combinedMatcher.match(dirName)) {
       matchedProjects.add(pkgName || dirName)
       matchedGraphics[dirName] = pkg
       matchedPaths.add(pkg.dirPath)
+      isMatched = true
+    }
+
+    if (isMatched) {
+      for (const pattern of patterns) {
+        if (!patternMatches.has(pattern)) {
+          const singleMatcher = createWorkspacePatternWASM([pattern], options?.experimental?.debug || false)
+          const matched = (pkgName && singleMatcher.match(pkgName)) || singleMatcher.match(dirName)
+          if (matched) { patternMatches.set(pattern, true) }
+          singleMatcher.dispose()
+        }
+      }
     }
   }
   combinedMatcher.dispose()
 
   for (const pattern of patterns) {
-    const singleMatcher = createWorkspacePatternWASM([pattern], options?.experimental?.debug || false)
-    const hasMatch = packageIds.some((id) => {
-      const pkg = packageGraph[id]
-      const pkgName = pkg.manifest.name
-      const dirName = path.basename(pkg.dirPath)
-      return (pkgName && singleMatcher.match(pkgName)) || singleMatcher.match(dirName)
-    })
-    if (!hasMatch) {
+    if (!patternMatches.has(pattern)) {
       unmatchedFilters.add(pattern)
     }
-    singleMatcher.dispose()
   }
 
   return {
