@@ -10,7 +10,3 @@
 - This is a Zig port of the original JavaScript package
 - Performance optimizations are still in progress
 - API might not be stable
-
-### CheckList
-
-- [*] workspace pattern

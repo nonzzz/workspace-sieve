@@ -2,7 +2,7 @@ import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
 import type { Package, ProjectManifest } from './interface'
-import { createWorkspacePatternWASM } from './pattern'
+import { createWorkspacePattern } from './pattern'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
   patterns?: string[]
@@ -123,7 +123,7 @@ export function filterWorkspacePackagesByGraphics(
   const matchedGraphics: Record<string, Package> = {}
   const patternMatches = new Map<string, boolean>()
 
-  const combinedMatcher = createWorkspacePatternWASM(patterns, options?.experimental?.debug || false)
+  const combinedMatcher = createWorkspacePattern(patterns, options?.experimental?.debug || false)
 
   for (const id of packageIds) {
     const pkg = packageGraph[id]
@@ -149,15 +149,13 @@ export function filterWorkspacePackagesByGraphics(
     if (isMatched) {
       for (const pattern of patterns) {
         if (!patternMatches.has(pattern)) {
-          const singleMatcher = createWorkspacePatternWASM([pattern], options?.experimental?.debug || false)
+          const singleMatcher = createWorkspacePattern([pattern], options?.experimental?.debug || false)
           const matched = (pkgName && singleMatcher.match(pkgName)) || singleMatcher.match(dirName)
           if (matched) { patternMatches.set(pattern, true) }
-          singleMatcher.dispose()
         }
       }
     }
   }
-  combinedMatcher.dispose()
 
   for (const pattern of patterns) {
     if (!patternMatches.has(pattern)) {
@@ -173,6 +171,6 @@ export function filterWorkspacePackagesByGraphics(
 }
 
 export { searchForPackageRoot, searchForWorkspaceRoot } from './find-workspace'
-export { createWorkspacePatternWASM } from './pattern'
+export { createWorkspacePattern } from './pattern'
 
 export * from './interface'
