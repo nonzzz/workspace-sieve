@@ -1,31 +1,24 @@
 import ansis from 'ansis'
 
+type PatternMatcher = (
+  patterns_ptr: number,
+  patterns_len_ptr: number,
+  patterns_count: number,
+  input_ptr: number,
+  input_len: number
+) => number
 interface PatternWASM {
   memory: WebAssembly.Memory
-  createMatcherContext: () => number
+  patternMatch: PatternMatcher
   initLogger: () => void
-  destroyMatcherContext: (contextPtr: number) => void
-  initMatcher: (contextPtr: number, patternsPtr: number, patternsLen: number, count: number) => number
-  matchPattern: (contextPtr: number, matcherId: number, inputPtr: number, inputLen: number) => number
-  disposeMatcher: (contextPtr: number, matcherId: number) => void
 }
 
-interface Instance {
-  module: PatternWASM
-  debugMode: boolean
+type Ref<T> = { current: T | null }
+
+interface Mod {
+  wasm: PatternWASM
+  debug: boolean
 }
-
-const instances = new Map<string, Instance>()
-let instanceCounter = 0
-
-const textEncoder = new TextEncoder()
-const textDecoder = new TextDecoder()
-
-const INPUT_MEMORY_OFFSET = 1024 * 4
-
-const WASM_PAGE_SIZE = 1024 * 64
-const OFFSET_PADDING = 1024
-const MAX_RAW_TEXT_SIZE = 1024 * 1024 * 16
 
 interface ZigENV extends WebAssembly.ModuleImports {
   _print_js_str: (ptr: number, len: number) => void
@@ -40,30 +33,20 @@ const LOG_LEVEL_ANSIS: Record<LoggerLevel, { icon: string, color: typeof ansis }
   3: { icon: '\u2716', color: ansis.red }
 }
 
-function createZigEnv(instanceId: string) {
-  let instance: Instance | undefined
+const textDecoder = new TextDecoder()
 
-  const not = () => !instance || !instance.debugMode
-
-  const getInstance = (i: Instance | undefined): i is Instance => {
-    if (!instance) {
-      instance = instances.get(instanceId)
-      if (not()) {
-        return false
-      }
-    }
-    return !not()
-  }
-
+function createEnvWASM(modRef: Ref<Mod>) {
   return <ZigENV> {
-    _print_js_str: (ptr, len) => {
-      if (!getInstance(instance)) {
+    _print_js_str(ptr, len) {
+      if (!modRef.current) {
         return
       }
-      const mem = new Uint8Array(instance.module.memory.buffer)
-      const message = textDecoder.decode(mem.subarray(ptr, ptr + len))
-      const [levelStr, content] = message.split('|')
-      const { color, icon } = LOG_LEVEL_ANSIS[+levelStr as LoggerLevel]
+      if (!modRef.current.debug) {
+        return
+      }
+      const msg = textDecoder.decode(modRef.current.wasm.memory.buffer.slice(ptr, ptr + len))
+      const [level, content] = msg.split('|')
+      const { color, icon } = LOG_LEVEL_ANSIS[+level as LoggerLevel]
       console.log(`${icon} ${color(content)}`)
     }
   }
@@ -71,107 +54,115 @@ function createZigEnv(instanceId: string) {
 
 let compiledWASM: WebAssembly.Module | undefined
 
-function loadWASM(debug: boolean) {
-  const instanceId = `wasm_${++instanceCounter}`
+const Magic = {
+  IS_LE: new Uint8Array(new Uint16Array([1]).buffer)[0] === 1,
+  MAX_RAW_TEXT: 1024 * 1024 * 8,
+  PAGE_SIZE: 1024 * 64,
+  PADDING: 1024
+}
 
+// Note: This impl repsect C style string.
+// eg:
+// pass abc should be as abc\0
+const utf16 = {
+  encode: (str: string, dest: WebAssembly.Memory, offset: number): number => {
+    offset = (offset + 1) & ~1
+    const view = new Uint16Array(dest.buffer, offset, str.length + 1)
+    const len = str.length
+    for (let i = 0; i < len; i++) {
+      view[i] = str.charCodeAt(i)
+    }
+    view[len] = 0
+
+    if (!Magic.IS_LE) {
+      for (let i = 0; i <= len; i++) {
+        const value = view[i]
+        view[i] = ((value & 0xff) << 8) | ((value >> 8) & 0xff)
+      }
+    }
+    return (len + 1) * 2
+  }
+}
+
+function loadWASM(debug: boolean) {
   if (!compiledWASM) {
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
     compiledWASM = new WebAssembly.Module(bytes)
   }
-  const compiled = compiledWASM
-  const env = createZigEnv(instanceId)
-  const module = new WebAssembly.Instance(compiled, { env }).exports as unknown as PatternWASM
-  instances.set(instanceId, {
-    module,
-    debugMode: debug
-  })
+  const mod: Ref<Mod> = { current: null }
+  const env = createEnvWASM(mod)
+  const instance = new WebAssembly.Instance(compiledWASM, { env }).exports as unknown as PatternWASM
+  mod.current = { wasm: instance, debug }
 
-  return { instanceId, module, debug }
+  return mod
 }
 
-// In zig part, the str is defined as a slice in C style.
-function initMatcherContext(module: PatternWASM, patterns: string[], debug = false) {
-  const maxPatternLen = Math.max(...patterns.map((p) => p.length))
-  const maxPatternLenBytes = Math.ceil(maxPatternLen / WASM_PAGE_SIZE) * WASM_PAGE_SIZE
-  const maxRawTextSize = Math.min(MAX_RAW_TEXT_SIZE, maxPatternLenBytes)
-
-  if (maxPatternLen > maxRawTextSize) {
-    throw new Error(`Pattern length exceeds maximum size of ${maxRawTextSize} bytes`)
-  }
-  // grow memory
-  const growSize = Math.ceil((maxPatternLen + OFFSET_PADDING) / WASM_PAGE_SIZE)
-
-  if (growSize > 1) {
-    module.memory.grow(growSize)
-    if (debug) {
-      console.log(`Memory grown by ${growSize} pages (${growSize * WASM_PAGE_SIZE} bytes)`)
-    }
-  }
-
-  module.initLogger()
-  const contextPtr = module.createMatcherContext()
-  const mem = new Uint8Array(module.memory.buffer)
-  //  0-1024 maybe wasm reserved characters.
-  let offset = OFFSET_PADDING
-  const lengths = new Uint32Array(patterns.length)
-
-  for (let i = 0; i < patterns.length; i++) {
-    const pattern = patterns[i]
-    const encoded = textEncoder.encode(pattern)
-    mem.set(encoded, offset)
-    mem[offset + encoded.length] = 0 // null terminator
-    lengths[i] = encoded.length
-    offset += encoded.length + 1
-  }
-  const lengthsPtr = INPUT_MEMORY_OFFSET + 2048
-  mem.set(new Uint8Array(lengths.buffer), lengthsPtr)
-
-  const matcherId = module.initMatcher(contextPtr, OFFSET_PADDING, lengthsPtr, patterns.length)
-  return { matcherId, contextPtr }
+export interface WorkspacePatternsMethods {
+  match: (input: string) => boolean
 }
 
-function createMatcher(patterns: string[], debug = false) {
-  const { instanceId, module, debug: debugMode } = loadWASM(debug)
-  const { matcherId, contextPtr } = initMatcherContext(module, patterns, debugMode)
-
-  let lastMatcherRawTextSize = 0
-
+function createMatcher(mod: Ref<Mod>, patterns: string[]) {
   return {
-    match: (input: string): boolean => {
-      const maxInputLenBytes = Math.ceil(input.length / WASM_PAGE_SIZE) * WASM_PAGE_SIZE
-      const maxRawTextSize = Math.min(MAX_RAW_TEXT_SIZE, maxInputLenBytes)
-      if (maxInputLenBytes > maxRawTextSize) {
-        throw new Error(`Input length exceeds maximum size of ${maxRawTextSize} bytes`)
+    match: (input: string) => {
+      if (!mod.current) {
+        throw new Error('WASM module not loaded')
       }
-      const len = maxInputLenBytes + OFFSET_PADDING
-      const growSize = Math.ceil((maxInputLenBytes + OFFSET_PADDING) / WASM_PAGE_SIZE)
-      if (growSize > 1 && len > lastMatcherRawTextSize) {
-        module.memory.grow(growSize)
-        if (debugMode) {
-          console.log(`Memory grown by ${growSize} pages (${growSize * WASM_PAGE_SIZE} bytes)`)
+
+      const { totalTextLen } = [...patterns, input].reduce((acc, text) => {
+        if (text.length > Magic.MAX_RAW_TEXT) {
+          throw new Error(`Text length exceeds maximum size of ${Magic.MAX_RAW_TEXT} bytes`)
         }
-        lastMatcherRawTextSize = len
+        return {
+          totalTextLen: acc.totalTextLen + text.length
+        }
+      }, { totalTextLen: 0 })
+      const { wasm, debug } = mod.current
+      // Align the text len based on 2 bytes
+      const alignedTextLen = totalTextLen % 2 === 0 ? totalTextLen : totalTextLen + 1
+      const extraMem = Magic.PADDING + alignedTextLen * 4 - wasm.memory.buffer.byteLength
+      if (extraMem > 0) {
+        const page = Math.ceil(extraMem / Magic.PAGE_SIZE)
+        wasm.memory.grow(page)
+        if (debug) {
+          console.log(`Memory grown by ${page} pages (${page * Magic.PAGE_SIZE} bytes)`)
+        }
       }
-      const mem = new Uint8Array(module.memory.buffer)
+      let offset = Magic.PADDING
+      offset = (offset + 3) & ~3
+      const patternsPtr = offset
+      const patternLengths = new Uint32Array(patterns.length)
+      for (let i = 0; i < patterns.length; i++) {
+        const pattern = patterns[i]
+        const bytesWritten = utf16.encode(pattern, wasm.memory, offset)
+        patternLengths[i] = pattern.length
+        offset += bytesWritten
+        offset = (offset + 3) & ~3
+      }
+      const patternsLenPtr = offset
+      const patternsLenView = new Uint8Array(patternLengths.buffer)
+      const mem = new Uint8Array(wasm.memory.buffer)
+      for (let i = 0; i < patternsLenView.length; i++) {
+        mem[patternsLenPtr + i] = patternsLenView[i]
+      }
 
-      const { written } = textEncoder.encodeInto(input, mem.subarray(INPUT_MEMORY_OFFSET, INPUT_MEMORY_OFFSET + maxRawTextSize))
+      const inputPtr = patternsLenPtr + patternsLenView.length
 
-      return !!module.matchPattern(contextPtr, matcherId, INPUT_MEMORY_OFFSET, written)
-    },
+      const bytesWritten = utf16.encode(input, wasm.memory, inputPtr)
+      const inputLen = bytesWritten / 2
 
-    dispose: () => {
-      module.disposeMatcher(contextPtr, matcherId)
-      module.destroyMatcherContext(contextPtr)
-      instances.delete(instanceId)
-      lastMatcherRawTextSize = 0
+      wasm.initLogger()
+      return !!wasm.patternMatch(patternsPtr, patternsLenPtr, patterns.length, inputPtr, inputLen)
     }
   }
 }
 
-export function createWorkspacePatternWASM(patterns: string[], debug = false) {
-  const matcher = createMatcher(patterns, debug)
+export function createWorkspacePattern(patterns: string[], debug = false): WorkspacePatternsMethods {
+  const mod = loadWASM(debug)
+  const matcher = createMatcher(mod, patterns)
+
   return {
-    match: (input: string) => matcher.match(input),
-    dispose: () => matcher.dispose()
+    match: (input) => matcher.match(input)
   }
 }
+
+export const createWorkspacePatternWASM = createWorkspacePattern

@@ -1,4 +1,4 @@
-import { afterAll, bench, describe } from 'vitest'
+import { bench, describe } from 'vitest'
 import { createWorkspacePatternWASM } from '../dist'
 
 interface PatternMatchMatrix {
@@ -60,7 +60,7 @@ const generateInputs = (count: number): string[] => {
   return inputs
 }
 
-const BENCHMARK_INPUTS = generateInputs(10000)
+const BENCHMARK_INPUTS = generateInputs(1000)
 
 describe('Pattern Matcher Benchmark', () => {
   describe('Simple Pattern Matching', () => {
@@ -70,10 +70,6 @@ describe('Pattern Matcher Benchmark', () => {
       for (const input of BENCHMARK_INPUTS) {
         wasmSimpleMatcher.match(input)
       }
-    })
-
-    afterAll(() => {
-      wasmSimpleMatcher.dispose()
     })
   })
 
@@ -86,10 +82,6 @@ describe('Pattern Matcher Benchmark', () => {
         wasmComplexMatcher.match(input)
       }
     })
-
-    afterAll(() => {
-      wasmComplexMatcher.dispose()
-    })
   })
 
   describe('Multiple Matchers Concurrency', () => {
@@ -100,10 +92,6 @@ describe('Pattern Matcher Benchmark', () => {
         for (const input of BENCHMARK_INPUTS) {
           matcher.match(input)
         }
-      }
-
-      for (const matcher of matchers) {
-        matcher.dispose()
       }
     })
   })

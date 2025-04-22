@@ -152,12 +152,10 @@ export function filterWorkspacePackagesByGraphics(
           const singleMatcher = createWorkspacePatternWASM([pattern], options?.experimental?.debug || false)
           const matched = (pkgName && singleMatcher.match(pkgName)) || singleMatcher.match(dirName)
           if (matched) { patternMatches.set(pattern, true) }
-          singleMatcher.dispose()
         }
       }
     }
   }
-  combinedMatcher.dispose()
 
   for (const pattern of patterns) {
     if (!patternMatches.has(pattern)) {

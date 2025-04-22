@@ -78,7 +78,6 @@ describe('WASM Pattern Matcher', () => {
       for (const { input, state } of fixture.expected) {
         expect(matcher.match(input), `${input} -- ${JSON.stringify(fixture.matchRule)}`).toBe(state)
       }
-      matcher.dispose()
     }
   })
 })
