@@ -49,8 +49,8 @@ importers:
         specifier: npm:rolldown-vite@6.3.0-beta.5
         version: rolldown-vite@6.3.0-beta.5(@types/node@22.10.5)(esbuild@0.25.1)(tsx@4.19.3)(typescript@5.7.2)
       vite-bundle-analyzer:
-        specifier: ^0.18.1
-        version: 0.18.1
+        specifier: ^0.20.1
+        version: 0.20.1
       vitest:
         specifier: ^3.0.9
         version: 3.0.9(@types/node@22.10.5)(lightningcss@1.29.3)(tsx@4.19.3)
@@ -1454,8 +1454,8 @@ packages:
       typescript:
         optional: true
 
-  vite-bundle-analyzer@0.18.1:
-    resolution: {integrity: sha512-VQgrvxRuiZuOhM61p85lGpxzWR3TUbgn1LYtCBL09LUVoKy+yoxPwWTq+ihuPqT5L4tp0Jiiaa/dGYIRF8Guag==}
+  vite-bundle-analyzer@0.20.1:
+    resolution: {integrity: sha512-0uGcukPglrNUM5/0gPMQSLOaq2YXeyt+YCHfpZZJxnfl0oucx7zdZmVxVL4c0SlsBD0gNOPZd1GNYwg44MRTeQ==}
     hasBin: true
 
   vite-node@3.0.9:
@@ -2829,7 +2829,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.7.2
 
-  vite-bundle-analyzer@0.18.1: {}
+  vite-bundle-analyzer@0.20.1: {}
 
   vite-node@3.0.9(@types/node@22.10.5)(lightningcss@1.29.3)(tsx@4.19.3):
     dependencies:

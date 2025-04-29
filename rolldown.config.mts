@@ -3,10 +3,9 @@ import fs from 'fs'
 import { builtinModules } from 'module'
 import path from 'path'
 import { defineConfig } from 'rolldown'
-import type { RolldownPlugin } from 'rolldown'
 import ts from 'typescript'
 import url from 'url'
-import { adapter, analyzer } from 'vite-bundle-analyzer'
+import { analyzer, unstableRolldownAdapter } from 'vite-bundle-analyzer'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 
@@ -16,31 +15,28 @@ const external = [...builtinModules, ...Object.keys(dependencies)]
 
 const ENABLE_ANALYZER = process.env.ENABLE_ANALYZER === 'true'
 
-export default defineConfig([
-  {
-    input: 'src/index.ts',
-    external,
-    platform: 'node',
-    define: {
-      b64: JSON.stringify(fs.readFileSync(path.join(__dirname, 'zig-out', 'zig-lib.wasm'), 'base64'))
-    },
-    output: [
-      { dir: 'dist', format: 'esm', exports: 'named', entryFileNames: '[name].mjs', chunkFileNames: '[name]-[hash].mjs' },
-      { dir: 'dist', format: 'cjs', exports: 'named', entryFileNames: '[name].js' }
-    ],
-    plugins: [
-      // Now: rolldown has some bug with `closeBundle` so it will generate two server instance,will be fix by plug-in self.
-      ENABLE_ANALYZER && adapter(analyzer()) as RolldownPlugin,
-      {
-        name: 'dts',
-        closeBundle() {
-          generateDTS()
-          fs.rmSync(path.join(process.cwd(), 'dist/src'), { recursive: true })
-        }
+export default defineConfig({
+  input: 'src/index.ts',
+  external,
+  platform: 'node',
+  define: {
+    b64: JSON.stringify(fs.readFileSync(path.join(__dirname, 'zig-out', 'zig-lib.wasm'), 'base64'))
+  },
+  output: [
+    { dir: 'dist', format: 'esm', exports: 'named', entryFileNames: '[name].mjs', chunkFileNames: '[name]-[hash].mjs' },
+    { dir: 'dist', format: 'cjs', exports: 'named', entryFileNames: '[name].js' }
+  ],
+  plugins: [
+    ENABLE_ANALYZER && unstableRolldownAdapter(analyzer()),
+    {
+      name: 'dts',
+      closeBundle() {
+        generateDTS()
+        fs.rmSync(path.join(process.cwd(), 'dist/src'), { recursive: true })
       }
-    ]
-  }
-])
+    }
+  ]
+})
 
 function generateDTS() {
   const files: Record<string, string> = {}
