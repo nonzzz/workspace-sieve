@@ -2,6 +2,12 @@ const std = @import("std");
 const zbench = @import("zbench");
 const pattern = @import("./pattern.zig");
 
+var global_allocator: std.mem.Allocator = undefined;
+var global_inputs: [][]const u8 = undefined;
+var simple_matcher: pattern.PatternMatcher = undefined;
+var complex_matcher: pattern.PatternMatcher = undefined;
+var multi_matchers: []pattern.PatternMatcher = undefined;
+
 fn generateInputs(allocator: std.mem.Allocator, count: usize) [][]const u8 {
     const prefixes = [_][]const u8{ "eslint-", "webpack-", "babel-", "@vue/", "@react/", "rollup-", "vite-" };
     const types = [_][]const u8{ "plugin", "config", "preset", "loader", "parser", "core" };
@@ -27,48 +33,14 @@ fn generateInputs(allocator: std.mem.Allocator, count: usize) [][]const u8 {
     return inputs;
 }
 
-fn benchSimplePatternMatching(allocator: std.mem.Allocator) void {
-    const inputs = generateInputs(allocator, 1000);
-    defer {
-        for (inputs) |input| {
-            allocator.free(input);
-        }
-        allocator.free(inputs);
-    }
+fn setupBenchmarks(allocator: std.mem.Allocator) !void {
+    global_allocator = allocator;
 
-    var matcher = pattern.PatternMatcher.init(allocator, &[_][]const u8{"eslint-*"}) catch @panic("Failed to init matcher");
-    defer matcher.deinit();
+    global_inputs = generateInputs(allocator, 1000);
 
-    for (inputs) |input| {
-        _ = matcher.match_any(input);
-    }
-}
+    simple_matcher = try pattern.PatternMatcher.init(allocator, &[_][]const u8{"eslint-*"});
 
-fn benchComplexPatternMatching(allocator: std.mem.Allocator) void {
-    const inputs = generateInputs(allocator, 1000);
-    defer {
-        for (inputs) |input| {
-            allocator.free(input);
-        }
-        allocator.free(inputs);
-    }
-
-    var matcher = pattern.PatternMatcher.init(allocator, &[_][]const u8{ "eslint-*", "!eslint-plugin-*", "eslint-plugin-react", "*loader" }) catch @panic("Failed to init matcher");
-    defer matcher.deinit();
-
-    for (inputs) |input| {
-        _ = matcher.match_any(input);
-    }
-}
-
-fn benchMultipleMatchersConcurrency(allocator: std.mem.Allocator) void {
-    const inputs = generateInputs(allocator, 1000);
-    defer {
-        for (inputs) |input| {
-            allocator.free(input);
-        }
-        allocator.free(inputs);
-    }
+    complex_matcher = try pattern.PatternMatcher.init(allocator, &[_][]const u8{ "eslint-*", "!eslint-plugin-*", "eslint-plugin-react", "*loader" });
 
     const pattern_matrices = [_][]const []const u8{
         &[_][]const u8{"*"},
@@ -78,28 +50,55 @@ fn benchMultipleMatchersConcurrency(allocator: std.mem.Allocator) void {
         &[_][]const u8{ "!eslint-plugin-bar", "eslint-*" },
     };
 
-    var matchers = allocator.alloc(pattern.PatternMatcher, pattern_matrices.len) catch @panic("Out of memory");
-    defer allocator.free(matchers);
-
+    multi_matchers = try allocator.alloc(pattern.PatternMatcher, pattern_matrices.len);
     for (pattern_matrices, 0..) |rules, i| {
-        matchers[i] = pattern.PatternMatcher.init(allocator, rules) catch @panic("Failed to init matcher");
+        multi_matchers[i] = try pattern.PatternMatcher.init(allocator, rules);
     }
-    defer {
-        for (matchers) |*matcher| {
-            matcher.deinit();
-        }
-    }
+}
 
-    for (matchers) |matcher| {
-        for (inputs) |input| {
+fn teardownBenchmarks() void {
+    for (global_inputs) |input| {
+        global_allocator.free(input);
+    }
+    global_allocator.free(global_inputs);
+
+    simple_matcher.deinit();
+    complex_matcher.deinit();
+
+    for (multi_matchers) |*matcher| {
+        matcher.deinit();
+    }
+    global_allocator.free(multi_matchers);
+}
+
+fn benchSimplePatternMatching(_: std.mem.Allocator) void {
+    for (global_inputs) |input| {
+        _ = simple_matcher.match_any(input);
+    }
+}
+
+fn benchComplexPatternMatching(_: std.mem.Allocator) void {
+    for (global_inputs) |input| {
+        _ = complex_matcher.match_any(input);
+    }
+}
+
+fn benchMultipleMatchersConcurrency(_: std.mem.Allocator) void {
+    for (multi_matchers) |matcher| {
+        for (global_inputs) |input| {
             _ = matcher.match_any(input);
         }
     }
 }
 
 pub fn main() !void {
+    const allocator = std.heap.page_allocator;
     const stdout = std.io.getStdOut().writer();
-    var bench = zbench.Benchmark.init(std.heap.page_allocator, .{});
+
+    try setupBenchmarks(allocator);
+    defer teardownBenchmarks();
+
+    var bench = zbench.Benchmark.init(allocator, .{});
     defer bench.deinit();
 
     try bench.add("Simple Pattern Matching", benchSimplePatternMatching, .{});
