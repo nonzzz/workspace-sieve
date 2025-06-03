@@ -1,9 +1,12 @@
+import type { WorkspacePatternsMethods } from './pattern'
 type MatcherWithIndex = (input: string) => number
-type Matcher = (input: string) => boolean
 
-export function createWorkspacePattern(patterns: string[]): Matcher {
+export function createWorkspacePattern(patterns: string[]): WorkspacePatternsMethods {
   const matcher = createMatcherWithIndex(patterns)
-  return (input) => matcher(input) !== -1
+  return {
+    match: (input: string): boolean => matcher(input) !== -1,
+    destroy: () => {/* no-op for JS matcher */}
+  }
 }
 
 function createMatcherWithIndex(patterns: string[]): MatcherWithIndex {

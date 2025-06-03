@@ -2,7 +2,7 @@ import path from 'path'
 import { globSync } from 'tinyglobby'
 import type { GlobOptions } from 'tinyglobby'
 import type { Package, ProjectManifest } from './interface'
-import { createWorkspacePattern } from './pattern'
+import { createWorkspacePattern } from './js-pattern'
 import { readJsonFile, unique } from './shared'
 export interface FindWorkspacePackagesOpts {
   patterns?: string[]
@@ -95,18 +95,17 @@ export async function filterWorkspacePackagesFromDirectory(
 
   return {
     allProjects,
-    ...filterWorkspacePackagesByGraphics(graphics, options?.filter || [], { experimental: options?.experimental })
+    ...filterWorkspacePackagesByGraphics(graphics, options?.filter || [])
   }
 }
 
 export interface FilterWorkspacePackagesByGraphicsOptions {
-  experimental?: { debug: boolean }
+  [key: string]: unknown
 }
 
 export function filterWorkspacePackagesByGraphics(
   packageGraph: Record<string, Package>,
-  patterns: string[],
-  options?: FilterWorkspacePackagesByGraphicsOptions
+  patterns: string[]
 ): FilterWorkspaceResult {
   if (!patterns.length) {
     return {
@@ -123,7 +122,7 @@ export function filterWorkspacePackagesByGraphics(
   const matchedGraphics: Record<string, Package> = {}
   const patternMatches = new Map<string, boolean>()
 
-  const combinedMatcher = createWorkspacePattern(patterns, options?.experimental?.debug || false)
+  const combinedMatcher = createWorkspacePattern(patterns)
 
   for (const id of packageIds) {
     const pkg = packageGraph[id]
@@ -149,9 +148,11 @@ export function filterWorkspacePackagesByGraphics(
     if (isMatched) {
       for (const pattern of patterns) {
         if (!patternMatches.has(pattern)) {
-          const singleMatcher = createWorkspacePattern([pattern], options?.experimental?.debug || false)
+          const singleMatcher = createWorkspacePattern([pattern])
           const matched = (pkgName && singleMatcher.match(pkgName)) || singleMatcher.match(dirName)
-          if (matched) { patternMatches.set(pattern, true) }
+          if (matched) {
+            patternMatches.set(pattern, true)
+          }
         }
       }
     }
@@ -171,6 +172,7 @@ export function filterWorkspacePackagesByGraphics(
 }
 
 export { searchForPackageRoot, searchForWorkspaceRoot } from './find-workspace'
-export { createWorkspacePattern } from './pattern'
+export { createWorkspacePattern } from './js-pattern'
+export { createWASMWorkspacePattern } from './pattern'
 
 export * from './interface'
