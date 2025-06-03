@@ -6,6 +6,7 @@ pub fn build(b: *std.Build) !void {
         .lib = b.step("lib", "Build library"),
         .unit_test = b.step("test", "Run tests"),
         .analysis = b.step("analysis", "Run analysis"),
+        .bench = b.step("bench", "Run benchmarks"),
     };
 
     const optimize = b.standardOptimizeOption(.{});
@@ -30,6 +31,32 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .analysis = true,
     });
+
+    build_benchmark(b, build_steps.bench, .{
+        .target = try resolve_target(b, .{}),
+        .optimize = optimize,
+    });
+}
+
+fn build_benchmark(
+    b: *std.Build,
+    step_bench: *std.Build.Step,
+    options: struct {
+        target: std.Build.ResolvedTarget,
+        optimize: std.builtin.OptimizeMode,
+    },
+) void {
+    const zbench_module = b.dependency("zbench", options).module("zbench");
+    const lib_generate = b.addExecutable(.{
+        .name = "zig-lib",
+        .root_source_file = b.path("zig/pattern-bench.zig"),
+        .target = options.target,
+        .optimize = .ReleaseSmall,
+    });
+    lib_generate.root_module.addImport("zbench", zbench_module);
+
+    const run_bench = b.addRunArtifact(lib_generate);
+    step_bench.dependOn(&run_bench.step);
 }
 
 fn build_lib(
