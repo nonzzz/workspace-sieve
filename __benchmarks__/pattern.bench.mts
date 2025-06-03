@@ -1,6 +1,15 @@
+import { createMatcher } from '@pnpm/matcher'
 import { bench, describe } from 'vitest'
 import { createWASMWorkspacePattern, createWorkspacePattern as createJSWorkspacePattern } from '../dist/index.mjs'
 import { WorkspacePatternsMethods } from '../src/pattern'
+
+function createPnpmWorkspacePattern(patterns: string[]): WorkspacePatternsMethods {
+  const matcher = createMatcher(patterns)
+  return {
+    match: (input: string) => matcher(input),
+    destroy: () => {/* @pnpm/matcher no need this */}
+  }
+}
 
 function generateLargeInputs(): string[] {
   const prefixes = ['@types', '@babel', '@vue', '@nuxt', '@rollup', '@vite', '@testing-library']
@@ -166,6 +175,14 @@ describe('Pattern Matching Performance', () => {
       }
       matcher.destroy()
     })
+
+    bench('PNPM - Simple patterns', () => {
+      const matcher = createPnpmWorkspacePattern(patterns)
+      for (const input of inputs) {
+        matcher.match(input)
+      }
+      matcher.destroy()
+    })
   })
 
   describe('Medium Complexity Patterns', () => {
@@ -181,6 +198,14 @@ describe('Pattern Matching Performance', () => {
 
     bench('JS - Medium patterns', () => {
       const matcher = createJSWorkspacePattern(patterns)
+      for (const input of inputs) {
+        matcher.match(input)
+      }
+      matcher.destroy()
+    })
+
+    bench('PNPM - Medium patterns', () => {
+      const matcher = createPnpmWorkspacePattern(patterns)
       for (const input of inputs) {
         matcher.match(input)
       }
@@ -206,6 +231,14 @@ describe('Pattern Matching Performance', () => {
       }
       matcher.destroy()
     })
+
+    bench('PNPM - Complex patterns', () => {
+      const matcher = createPnpmWorkspacePattern(patterns)
+      for (const input of inputs) {
+        matcher.match(input)
+      }
+      matcher.destroy()
+    })
   })
 
   describe('Large Scale Patterns', () => {
@@ -226,6 +259,14 @@ describe('Pattern Matching Performance', () => {
       }
       matcher.destroy()
     })
+
+    bench('PNPM - Large scale', () => {
+      const matcher = createPnpmWorkspacePattern(patterns)
+      for (const input of inputs) {
+        matcher.match(input)
+      }
+      matcher.destroy()
+    })
   })
 
   describe('Matcher Creation Overhead', () => {
@@ -239,6 +280,13 @@ describe('Pattern Matching Performance', () => {
       matcher.destroy()
     })
 
+    bench('PNPM - Create and destroy matcher (simple)', () => {
+      const matcher = createPnpmWorkspacePattern(scenarios.simple.patterns)
+      matcher.destroy()
+    })
+  })
+
+  describe('Matcher Creation Overhead (Complex)', () => {
     bench('WASM - Create and destroy matcher (complex)', () => {
       const matcher = createWASMWorkspacePattern(scenarios.complex.patterns)
       matcher.destroy()
@@ -248,17 +296,30 @@ describe('Pattern Matching Performance', () => {
       const matcher = createJSWorkspacePattern(scenarios.complex.patterns)
       matcher.destroy()
     })
+
+    bench('PNPM - Create and destroy matcher (complex)', () => {
+      const matcher = createPnpmWorkspacePattern(scenarios.complex.patterns)
+      matcher.destroy()
+    })
   })
 
   describe('Single Match Performance', () => {
     bench('WASM - Single match (reused matcher)', () => {
       const matcher = createWASMWorkspacePattern(scenarios.complex.patterns)
       matcher.match('@types/react')
+      matcher.destroy()
     })
 
     bench('JS - Single match (reused matcher)', () => {
       const matcher = createJSWorkspacePattern(scenarios.complex.patterns)
       matcher.match('@types/react')
+      matcher.destroy()
+    })
+
+    bench('PNPM - Single match (reused matcher)', () => {
+      const matcher = createPnpmWorkspacePattern(scenarios.complex.patterns)
+      matcher.match('@types/react')
+      matcher.destroy()
     })
   })
 
@@ -292,6 +353,55 @@ describe('Pattern Matching Performance', () => {
       }
       matcher.destroy()
     })
+
+    bench('PNPM - Edge cases', () => {
+      const matcher = createPnpmWorkspacePattern(edgePatterns)
+      for (const input of edgeInputs) {
+        matcher.match(input)
+      }
+      matcher.destroy()
+    })
+  })
+
+  describe('Performance Comparison Tests', () => {
+    const comparisonPatterns = ['@types/*', '!@types/node', '*-plugin', 'eslint-*']
+    const comparisonInputs = [
+      '@types/react',
+      '@types/node',
+      'webpack-plugin',
+      'eslint-config-airbnb',
+      'random-package'
+    ]
+
+    bench('WASM - Performance comparison', () => {
+      const matcher = createWASMWorkspacePattern(comparisonPatterns)
+      for (let i = 0; i < 1000; i++) {
+        for (const input of comparisonInputs) {
+          matcher.match(input)
+        }
+      }
+      matcher.destroy()
+    })
+
+    bench('JS - Performance comparison', () => {
+      const matcher = createJSWorkspacePattern(comparisonPatterns)
+      for (let i = 0; i < 1000; i++) {
+        for (const input of comparisonInputs) {
+          matcher.match(input)
+        }
+      }
+      matcher.destroy()
+    })
+
+    bench('PNPM - Performance comparison', () => {
+      const matcher = createPnpmWorkspacePattern(comparisonPatterns)
+      for (let i = 0; i < 1000; i++) {
+        for (const input of comparisonInputs) {
+          matcher.match(input)
+        }
+      }
+      matcher.destroy()
+    })
   })
 })
 
@@ -317,6 +427,23 @@ describe.skip('Memory Usage Analysis', () => {
     const matchers = []
     for (let i = 0; i < 100; i++) {
       matchers.push(createJSWorkspacePattern(scenarios.complex.patterns))
+    }
+
+    for (const matcher of matchers) {
+      for (const input of scenarios.complex.inputs) {
+        matcher.match(input)
+      }
+    }
+
+    for (const matcher of matchers) {
+      matcher.destroy()
+    }
+  })
+
+  bench('PNPM - Memory stress test', () => {
+    const matchers = []
+    for (let i = 0; i < 100; i++) {
+      matchers.push(createPnpmWorkspacePattern(scenarios.complex.patterns))
     }
 
     for (const matcher of matchers) {

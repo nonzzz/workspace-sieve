@@ -24,22 +24,22 @@
     "README.md"
   ],
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.52.4",
+    "@pnpm/matcher": "^1000.0.0",
     "@types/node": "^22.10.5",
     "dprint": "^0.48.0",
     "eslint": "^9.17.0",
     "eslint-config-kagura": "^3.0.1",
     "memdisk": "^1.2.1",
+    "rolldown": "1.0.0-beta.7",
     "tinybench": "^4.0.1",
     "typescript": "^5.7.2",
     "vite": "npm:rolldown-vite@6.3.0-beta.5",
-    "vitest": "^3.0.9",
-    "rolldown": "1.0.0-beta.7",
-    "@microsoft/api-extractor": "^7.52.4",
-    "vite-bundle-analyzer": "^0.20.1"
+    "vite-bundle-analyzer": "^0.20.1",
+    "vitest": "^3.0.9"
   },
   "dependencies": {
-    "tinyglobby": "^0.2.12",
-    "ansis": "^3.17.0"
+    "tinyglobby": "^0.2.12"
   },
   "repository": {
     "type": "git",
